@@ -54,5 +54,6 @@ export const env = {
   MAILER_TLS_REJECT_UNAUTHORIZED: envStr('MAILER_TLS_REJECT_UNAUTHORIZED', 'true').toLowerCase() !== 'false',
   MAILER_SERVICE: envStr('MAILER_SERVICE'),
   MAILER_FROM: envStr('MAILER_FROM'),
+  ALLOW_DEMO_LOGIN: envStr('ALLOW_DEMO_LOGIN', 'false').toLowerCase() === 'true',
 };
 

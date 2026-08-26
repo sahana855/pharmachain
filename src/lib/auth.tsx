@@ -2,6 +2,7 @@
 // Keeps the same useAuth() interface so existing components work unchanged.
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { setToken, getToken, clearToken } from './api';
+import { apiUrl } from './config';
 
 // sessionStorage key for persisting the OTP verification step across refreshes.
 // Cleared once the OTP is verified or the user cancels the login flow.
@@ -75,7 +76,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const fetchPendingVerifications = async () => {
     try {
       const token = getToken();
-      const res = await fetch('/api/auth/users', {
+      const res = await fetch(apiUrl('/api/auth/users'), {
         method: 'GET',
         headers: token ? { 'Authorization': `Bearer ${token}` } : undefined,
       });
@@ -94,7 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setLoading(false);
           return;
         }
-        const res = await fetch('/api/auth/me', {
+        const res = await fetch(apiUrl('/api/auth/me'), {
           method: 'GET',
           headers: { 'Authorization': `Bearer ${token}` },
         });
@@ -119,7 +120,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, password: string): Promise<AuthResult> => {
     try {
-      const res = await fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: email.trim(), password }) });
+      const res = await fetch(apiUrl('/api/auth/login'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: email.trim(), password }) });
       const responseText = await res.text();
       let data: any = null;
       try {
@@ -160,7 +161,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   ): Promise<AuthResult> => {
     try {
-      const res = await fetch('/api/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password, name, role, ...(extraFields || {}) }) });
+      const res = await fetch(apiUrl('/api/auth/register'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password, name, role, ...(extraFields || {}) }) });
       const data = await res.json();
       if (!res.ok) {
         return { success: false, error: data?.error || data?.message || 'Registration failed' };
@@ -182,7 +183,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const approveAllUsers = async () => {
     const token = getToken();
-    const res = await fetch('/api/auth/users/approve-all', {
+    const res = await fetch(apiUrl('/api/auth/users/approve-all'), {
       method: 'POST',
       headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     });
@@ -201,7 +202,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Verify OTP and complete login (sets JWT + user)
   const verifyOtp = async (email: string, otp: string): Promise<AuthResult> => {
     try {
-      const res = await fetch('/api/auth/verify-otp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: email.trim(), otp }) });
+      const res = await fetch(apiUrl('/api/auth/verify-otp'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: email.trim(), otp }) });
       const data = await res.json();
       if (!res.ok) return { success: false, error: data?.error || data?.message || 'OTP verification failed' };
       if (data.token) {
@@ -219,7 +220,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const resendOtp = async (email: string): Promise<AuthResult> => {
     try {
-      const res = await fetch('/api/auth/resend-otp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) });
+      const res = await fetch(apiUrl('/api/auth/resend-otp'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) });
       const data = await res.json();
       if (!res.ok) return { success: false, error: data?.error || data?.message || 'Resend failed' };
       return { success: true, message: data?.message };
@@ -230,7 +231,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const demoLogin = async (email: string, password: string): Promise<AuthResult> => {
     try {
-      const res = await fetch('/api/auth/demo-login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
+      const res = await fetch(apiUrl('/api/auth/demo-login'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
       const data = await res.json();
       if (!res.ok) return { success: false, error: data?.error || data?.message || 'Demo login failed' };
       if (data.token) {

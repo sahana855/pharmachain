@@ -130,7 +130,7 @@ router.post('/login', authLimiter, async (req, res, next) => {
 // Development-only bypass: skip OTP and issue JWT directly for demo accounts
 router.post('/demo-login', authLimiter, async (req, res, next) => {
   try {
-    if (env.NODE_ENV !== 'development') {
+    if (env.NODE_ENV !== 'development' && !env.ALLOW_DEMO_LOGIN) {
       return res.status(404).json({ success: false, error: 'Not found' });
     }
 
