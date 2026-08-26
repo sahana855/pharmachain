@@ -40,7 +40,7 @@ function envStr(key, fallback = '') {
 export const env = {
   PORT: parseInt(process.env.PORT || '41837', 10),
   NODE_ENV: process.env.NODE_ENV || 'development',
-  MONGODB_URI: process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/pharmachain',
+  PHARMACHAIN_MONGODB_URI: process.env.PHARMACHAIN_MONGODB_URI || '',
   JWT_SECRET: process.env.JWT_SECRET || 'pharmachain-dev-secret-change-me',
   JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || '7d',
   BLOCKCHAIN_RPC_URL: process.env.BLOCKCHAIN_RPC_URL || 'http://127.0.0.1:8545',

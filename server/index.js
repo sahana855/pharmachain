@@ -62,7 +62,7 @@ app.get('/api/debug/env', (req, res) => {
     nodeEnv: env.NODE_ENV,
     port: env.PORT,
     mongoConnected: mongooseConnectionState(),
-    mongoUri: env.MONGODB_URI.replace(/:\/\/[^@]+@/, '://***@'),
+    mongoUri: env.PHARMACHAIN_MONGODB_URI ? env.PHARMACHAIN_MONGODB_URI.replace(/:\/\/[^@]+@/, '://***@') : null,
   });
 });
 
@@ -155,7 +155,7 @@ async function start() {
     const server = app.listen(env.PORT, () => {
       console.log(`\n🚀 PharmaChain backend running on http://localhost:${env.PORT}`);
       console.log(`   API health: http://localhost:${env.PORT}/api/health`);
-      console.log(`   Mongo: ${env.MONGODB_URI.replace(/:\/\/[^@]+@/, '://***@')}\n`);
+      console.log(`   Mongo: ${env.PHARMACHAIN_MONGODB_URI ? env.PHARMACHAIN_MONGODB_URI.replace(/:\/\/[^@]+@/, '://***@') : 'not configured'}\n`);
     });
 
     const shutdown = async () => {

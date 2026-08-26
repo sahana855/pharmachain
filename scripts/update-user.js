@@ -2,7 +2,9 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
 async function main() {
-  await mongoose.connect('mongodb://127.0.0.1:27017/pharmachain');
+  const uri = process.env.PHARMACHAIN_MONGODB_URI;
+  if (!uri) throw new Error('PHARMACHAIN_MONGODB_URI is required');
+  await mongoose.connect(uri);
   const db = mongoose.connection.db;
   const hash = await bcrypt.hash('Admin@123', 10);
   const result = await db.collection('users').updateOne(

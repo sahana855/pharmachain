@@ -8,11 +8,14 @@ function maskedMongoUri(uri) {
 
 export async function connectDB() {
   try {
+    if (!env.PHARMACHAIN_MONGODB_URI) {
+      throw new Error('PHARMACHAIN_MONGODB_URI is not configured. Add it to Vercel environment variables or .env.local.');
+    }
     mongoose.set('strictQuery', true);
-    await mongoose.connect(env.MONGODB_URI, {
+    await mongoose.connect(env.PHARMACHAIN_MONGODB_URI, {
       serverSelectionTimeoutMS: 5000,
     });
-    console.log(`✅ MongoDB connected: ${maskedMongoUri(env.MONGODB_URI)}`);
+    console.log(`✅ MongoDB connected: ${maskedMongoUri(env.PHARMACHAIN_MONGODB_URI)}`);
     return mongoose.connection;
   } catch (err) {
     console.error('❌ MongoDB connection failed:', err.message);
