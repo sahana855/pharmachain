@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../lib/auth';
 import { getToken } from '../../lib/api';
+import { apiUrl } from '../../lib/config';
 import { useNavigate } from 'react-router-dom';
 import { useLiveSync } from '../../lib/events';
 import {
@@ -22,7 +23,7 @@ export default function AdminDashboard() {
     setError('');
     try {
       const token = getToken();
-      const res = await fetch('/api/auth/users', {
+      const res = await fetch(apiUrl('/api/auth/users'), {
         headers: token ? { Authorization: `Bearer ${token}` } : undefined,
       });
       if (!res.ok) {
@@ -38,15 +39,16 @@ export default function AdminDashboard() {
     }
   };
 
-   useEffect(() => {
-     if (!user || user.role !== 'admin') {
-       navigate('/login', { replace: true });
-       return;
-     }
-     fetchUsers();
-     // SSE real-time updates — refreshes user list when approvals happen
-     useLiveSync(fetchUsers);
-   }, [user]);
+  // SSE real-time updates — refreshes user list when approvals happen
+  useLiveSync(fetchUsers);
+
+  useEffect(() => {
+    if (!user || user.role !== 'admin') {
+      navigate('/login', { replace: true });
+      return;
+    }
+    fetchUsers();
+  }, [user]);
 
   const handleLogout = () => {
     logout();

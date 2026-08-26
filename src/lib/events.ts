@@ -4,6 +4,7 @@
 // to receive server-pushed events and trigger data refreshes.
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { getToken } from './api';
+import { API_BASE_URL } from './config';
 
 type EventHandler = (data: unknown) => void;
 
@@ -40,7 +41,7 @@ function ensureConnected(): EventSource {
   }
 
   const token = getToken();
-  const url = `/api/events${token ? `?token=${encodeURIComponent(token)}` : ''}`;
+  const url = `${API_BASE_URL}/api/events${token ? `?token=${encodeURIComponent(token)}` : ''}`;
   const es = new EventSource(url);
 
   EVENT_TYPES.forEach((type) => {

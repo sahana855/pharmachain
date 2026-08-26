@@ -1,7 +1,10 @@
+import 'dotenv/config';
 import bcrypt from 'bcryptjs';
 import mongoose from 'mongoose';
 
-await mongoose.connect('mongodb://127.0.0.1:27017/pharmachain');
+const uri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/pharmachain';
+console.log(`Connecting to ${uri.replace(/:([^:@]{3})[^:@]*@/, ':$1***@')}...`);
+await mongoose.connect(uri);
 const users = mongoose.connection.db.collection('users');
 
 const accounts = [

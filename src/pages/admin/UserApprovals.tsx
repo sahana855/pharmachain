@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../lib/auth';
 import { getToken } from '../../lib/api';
+import { apiUrl } from '../../lib/config';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, CheckCircle, Clock, Loader2, LogOut, Shield, UserCheck, XCircle } from 'lucide-react';
 
@@ -30,7 +31,7 @@ export default function UserApprovals() {
     setError('');
     try {
       const token = getToken();
-      const response = await fetch('/api/auth/users', {
+      const response = await fetch(apiUrl('/api/auth/users'), {
         headers: token ? { Authorization: `Bearer ${token}` } : undefined,
       });
       const data = await response.json().catch(() => ({}));

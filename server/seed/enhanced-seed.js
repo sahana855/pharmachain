@@ -60,8 +60,7 @@ async function seed() {
     console.log('👥 Seeding users...');
     const userIdMap = {};
     for (const u of demoUsers) {
-      const passwordHash = await bcrypt.hash(u.password, 10);
-      const created = await User.create({ ...u, password: passwordHash });
+      const created = await User.create(u);
       userIdMap[created.email] = created._id.toString();
       console.log(`   ✅ ${created.email} (${created.role})`);
     }

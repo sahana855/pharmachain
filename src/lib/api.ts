@@ -1,5 +1,6 @@
 // PharmaChain API client - connects the existing UI to the real MongoDB backend
 // Uses relative /api paths (Vite dev proxy -> Express on :41837; production Express serves both)
+import { apiUrl } from './config';
 
 const TOKEN_KEY = 'pharma_token';
 
@@ -47,7 +48,7 @@ async function request<T = any>(path: string, opts: RequestOptions = {}): Promis
 
   let res: Response;
   try {
-    res = await fetch(path, {
+    res = await fetch(apiUrl(path), {
       method,
       headers,
       body: body !== undefined ? JSON.stringify(body) : undefined,

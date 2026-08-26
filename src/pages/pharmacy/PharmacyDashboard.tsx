@@ -44,11 +44,11 @@ export default function PharmacyDashboard() {
     }
   }, [user]);
 
+  useLiveSync(fetchData);
+
   useEffect(() => {
     fetchData();
-    // SSE real-time updates — replaces polling for instant refresh on backend changes
-    useLiveSync(fetchData);
-    // Fallback polling (reduces refresh frequency)
+    // Fallback polling (less frequent — SSE handles real-time updates)
     const timer = setInterval(fetchData, 30000);
     return () => clearInterval(timer);
   }, [fetchData]);
