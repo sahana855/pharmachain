@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../lib/auth';
 import { useNavigate } from 'react-router-dom';
 import { shipmentApi } from '../../lib/api';
+import { useLiveSync } from '../../lib/events';
 import { AlertTriangle, Clock, ShoppingCart, Activity, Truck, Bell, RefreshCw, Waypoints } from 'lucide-react';
 import Card from '../../components/ui/Card';
 import Badge from '../../components/ui/Badge';
@@ -46,6 +47,9 @@ export default function PatientDashboard() {
     const timer = setInterval(fetchData, 15000);
     return () => clearInterval(timer);
   }, [fetchData]);
+
+  // Hook handles auto-refresh on server events
+  useLiveSync(fetchData);
 
   const handleRefresh = () => {
     setRefreshing(true);

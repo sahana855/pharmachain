@@ -73,11 +73,14 @@ import Analytics from './pages/Analytics';
 import Notifications from './pages/Notifications';
 import AIAssistant from './components/AIAssistant';
 
+import GlobalNotifications from './components/GlobalNotifications';
+
 function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
         <AIAssistant />
+        <GlobalNotifications />
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/verification" element={<Verification />} />

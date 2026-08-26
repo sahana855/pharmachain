@@ -3,41 +3,59 @@ import { useAuth } from '../../lib/auth';
 import { useNavigate } from 'react-router-dom';
 import { shipmentApi, transportBoxApi } from '../../lib/api';
 import { useLiveSync } from '../../lib/events';
+import { getDB } from '../../lib/db';
 import { Package, Truck, ShoppingCart, AlertTriangle, ArrowLeftRight, RefreshCw, Waypoints, Boxes } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import Card from '../../components/ui/Card';
 import Badge from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
 
+const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444'];
+
 export default function DealerDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [stats, setStats] = useState({ totalStock: 0, pendingOrders: 0, dispatches: 0, returns: 0, activeShipments: 0, inTransitBoxes: 0 });
+  const [stats, setStats] = useState({ totalStock: 0, lowStock: 0, expiredStock: 0, pendingOrders: 0, dispatches: 0, returns: 0, activeShipments: 0, inTransitBoxes: 0 });
   const [recentShipments, setRecentShipments] = useState<any[]>([]);
   const [recentBoxes, setRecentBoxes] = useState<any[]>([]);
+  const [stockData, setStockData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
-      const [shipData, boxData] = await Promise.all([
+      const [shipData, boxData, db] = await Promise.all([
         shipmentApi.list(),
         transportBoxApi.list(),
+        getDB(),
       ]);
 
       const shipments = shipData.items || [];
       const boxes = boxData.boxes || [];
+      const allStock = await db.getAll('stock');
 
       const myShipments = shipments.filter((s: any) => s.toId === user?.id || s.toId?._id === user?.id || s.fromId === user?.id || s.fromId?._id === user?.id);
       const myBoxes = boxes.filter((b: any) => b.dealerId === user?.id || b.dealerId?._id === user?.id);
+      const myStock = allStock.filter(s => s.ownerId === user?.id);
 
+      const now = new Date();
+      
       setStats({
-        totalStock: 0,
+        totalStock: myStock.reduce((sum, item) => sum + (item.quantity || 0), 0),
+        lowStock: myStock.filter(item => item.quantity < 50).length,
+        expiredStock: myStock.filter(item => new Date(item.expiryDate) < now).length,
         pendingOrders: myShipments.filter((s: any) => s.status === 'CREATED' || s.status === 'DISPATCHED').length,
         dispatches: myShipments.filter((s: any) => s.status === 'IN_TRANSIT').length,
         returns: 0,
         activeShipments: myShipments.filter((s: any) => s.status === 'DISPATCHED' || s.status === 'IN_TRANSIT').length,
         inTransitBoxes: myBoxes.filter((b: any) => b.status === 'IN_TRANSIT' || b.status === 'PICKED_UP').length,
       });
+
+      setStockData([
+        { name: 'Healthy Stock', value: myStock.filter(item => item.quantity >= 50 && new Date(item.expiryDate) >= now).length },
+        { name: 'Low Stock', value: myStock.filter(item => item.quantity < 50 && new Date(item.expiryDate) >= now).length },
+        { name: 'Expired', value: myStock.filter(item => new Date(item.expiryDate) < now).length },
+      ]);
 
       setRecentShipments(myShipments.slice(-5).reverse());
       setRecentBoxes(myBoxes.slice(-3).reverse());
@@ -52,10 +70,12 @@ export default function DealerDashboard() {
   useEffect(() => {
     fetchData();
     // SSE real-time updates
-    useLiveSync(fetchData);
     const timer = setInterval(fetchData, 30000);
     return () => clearInterval(timer);
   }, [fetchData]);
+
+  // Hook handles auto-refresh on server events
+  useLiveSync(fetchData);
 
   const handleRefresh = () => {
     setRefreshing(true);
@@ -84,8 +104,8 @@ export default function DealerDashboard() {
           <div className="flex items-center gap-3">
             <div className="p-3 bg-blue-100 rounded-lg"><Package className="w-6 h-6 text-blue-600" /></div>
             <div>
-              <p className="text-sm text-gray-500">Pending Orders</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.pendingOrders}</p>
+              <p className="text-sm text-gray-500">Total Stock</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.totalStock}</p>
             </div>
           </div>
         </Card>
@@ -171,6 +191,23 @@ export default function DealerDashboard() {
               </div>
             )}
           </div>
+        </Card>
+      </div>
+
+      {/* Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card title="Stock Distribution" subtitle="Healthy vs Low vs Expired Stock" icon={<Package />}>
+          <ResponsiveContainer width="100%" height={300}>
+            <PieChart>
+              <Pie data={stockData} cx="50%" cy="50%" innerRadius={60} outerRadius={100} dataKey="value" label>
+                {stockData.map((_, index) => (
+                  <Cell key={index} fill={COLORS[index % COLORS.length]} />
+                ))}
+              </Pie>
+              <Tooltip />
+              <Legend />
+            </PieChart>
+          </ResponsiveContainer>
         </Card>
       </div>
     </div>
