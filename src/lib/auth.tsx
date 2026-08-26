@@ -4,28 +4,6 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { setToken, getToken, clearToken } from './api';
 import { apiUrl } from './config';
 
-// sessionStorage key for persisting the OTP verification step across refreshes.
-// Cleared once the OTP is verified or the user cancels the login flow.
-const PENDING_OTP_KEY = 'pharma_pending_otp';
-
-export function storePendingOtp(email: string) {
-  sessionStorage.setItem(PENDING_OTP_KEY, JSON.stringify({ email, ts: Date.now() }));
-}
-
-export function getPendingOtp(): { email: string; ts: number } | null {
-  try {
-    const raw = sessionStorage.getItem(PENDING_OTP_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
-}
-
-export function clearPendingOtp() {
-  sessionStorage.removeItem(PENDING_OTP_KEY);
-}
-
 interface User {
   id: string;
   email: string;
@@ -60,10 +38,7 @@ interface AuthContextType {
   approveAllUsers: () => Promise<void>;
   rejectUser: (userId: string) => Promise<void>;
   pendingVerifications: User[];
-  verifyOtp: (email: string, otp: string) => Promise<AuthResult>;
-  resendOtp: (email: string) => Promise<AuthResult>;
   demoLogin: (email: string, password: string) => Promise<AuthResult>;
-  clearPendingOtp: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -149,7 +124,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = () => {
     setUser(null);
     clearToken();
-    clearPendingOtp();
   };
 
   const register = async (
@@ -203,36 +177,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {}
   };
 
-  // Verify OTP and complete login (sets JWT + user)
-  const verifyOtp = async (email: string, otp: string): Promise<AuthResult> => {
-    try {
-      const res = await fetch(apiUrl('/api/auth/verify-otp'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: email.trim(), otp }) });
-      const data = await res.json();
-      if (!res.ok) return { success: false, error: data?.error || data?.message || 'OTP verification failed' };
-      if (data.token) {
-        setToken(data.token);
-        setUser(data.user || null);
-        clearPendingOtp();
-        try { await fetchPendingVerifications(); } catch {}
-        return { success: true };
-      }
-      return { success: false, error: 'OTP verification did not return a token' };
-    } catch (err: any) {
-      return { success: false, error: err?.message || 'OTP verification failed' };
-    }
-  };
-
-  const resendOtp = async (email: string): Promise<AuthResult> => {
-    try {
-      const res = await fetch(apiUrl('/api/auth/resend-otp'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) });
-      const data = await res.json();
-      if (!res.ok) return { success: false, error: data?.error || data?.message || 'Resend failed' };
-      return { success: true, message: data?.message };
-    } catch (err: any) {
-      return { success: false, error: err?.message || 'Resend failed' };
-    }
-  };
-
   const demoLogin = async (email: string, password: string): Promise<AuthResult> => {
     try {
       const res = await fetch(apiUrl('/api/auth/demo-login'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
@@ -251,7 +195,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, register, approveUser, approveAllUsers, rejectUser, pendingVerifications, verifyOtp, resendOtp, demoLogin, clearPendingOtp }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, register, approveUser, approveAllUsers, rejectUser, pendingVerifications, demoLogin }}>
       {children}
     </AuthContext.Provider>
   );
