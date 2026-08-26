@@ -50,11 +50,12 @@ export default function TransportDashboard() {
 
   useEffect(() => {
     fetchData();
-    // SSE real-time updates
-    useLiveSync(fetchData);
     const timer = setInterval(fetchData, 30000);
     return () => clearInterval(timer);
   }, [fetchData]);
+
+  // SSE real-time updates
+  useLiveSync(fetchData);
 
   const handleRefresh = () => {
     setRefreshing(true);

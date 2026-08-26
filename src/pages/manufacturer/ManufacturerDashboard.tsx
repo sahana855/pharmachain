@@ -70,11 +70,12 @@ export default function ManufacturerDashboard() {
 
   useEffect(() => {
     fetchData();
-    // SSE real-time updates — instant refresh on backend changes
-    useLiveSync(fetchData);
     const timer = setInterval(fetchData, 30000); // fallback
     return () => clearInterval(timer);
   }, [fetchData]);
+
+  // SSE real-time updates — instant refresh on backend changes
+  useLiveSync(fetchData);
 
   const handleRefresh = () => {
     setRefreshing(true);
