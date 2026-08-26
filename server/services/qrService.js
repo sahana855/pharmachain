@@ -10,7 +10,7 @@ import QRCode from 'qrcode';
 import { generateQrToken } from '../utils/ids.js';
 import { env } from '../config/env.js';
 
-const BASE_URL = process.env.PUBLIC_BASE_URL || `http://localhost:${env.PORT}`;
+const BASE_URL = env.PUBLIC_BASE_URL || `http://localhost:${env.PORT}`;
 
 /**
  * Generate a medicine QR token (starts with MED-)

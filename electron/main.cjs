@@ -119,7 +119,7 @@ if (!gotLock) {
       // Try to start the backend using node server/index.js
       try {
         const serverPath = path.join(__dirname, '..');
-        backendProc = spawn(process.execPath || 'node', ['server/index.js'], {
+        backendProc = spawn('node', ['server/index.js'], {
           cwd: serverPath,
           env: process.env,
           stdio: 'inherit',

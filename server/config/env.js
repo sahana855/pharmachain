@@ -46,6 +46,7 @@ export const env = {
   BLOCKCHAIN_RPC_URL: process.env.BLOCKCHAIN_RPC_URL || 'http://127.0.0.1:8545',
   BLOCKCHAIN_CONTRACT_ADDRESS: process.env.BLOCKCHAIN_CONTRACT_ADDRESS || '',
   BLOCKCHAIN_PRIVATE_KEY: process.env.BLOCKCHAIN_PRIVATE_KEY || '',
+  PUBLIC_BASE_URL: envStr('PUBLIC_BASE_URL', ''),
   MAILER_HOST: envStr('MAILER_HOST'),
   MAILER_PORT: process.env.MAILER_PORT ? parseInt(process.env.MAILER_PORT, 10) : undefined,
   MAILER_USER: envStr('MAILER_USER'),

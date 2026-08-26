@@ -17,6 +17,7 @@ import bcrypt from 'bcryptjs';
 const COLLECTIONS = [
   'users', 'medicines', 'medicineverifications', 'shipments',
   'transportboxes', 'trackingevents', 'transporttrackingevents',
+  'blockchaintransactions',
 ];
 
 async function clearDatabase() {

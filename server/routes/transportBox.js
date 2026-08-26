@@ -54,7 +54,7 @@ router.get('/list', authenticate, async (req, res, next) => {
     if (user.role === 'manufacturer') filter.manufacturerId = user.id;
     else if (user.role === 'dealer') filter.$or = [{ manufacturerId: user.id }, { dealerId: user.id }];
     else if (user.role === 'transport') filter.transporterId = user.id;
-    else if (user.role === 'pharmacy') filter.$or = [{ dealerId: user.id }, { destination: { $exists: true } }];
+    else if (user.role === 'pharmacy') filter.dealerId = user.id;
     // admin sees all
 
     const boxes = await TransportBox.find(filter).sort({ createdAt: -1 }).limit(200);
@@ -387,11 +387,11 @@ router.put('/:boxId/status', authenticate, async (req, res, next) => {
       });
     }
 
-    // Dealer / Pharmacy receive
+    // Receiver / Admin confirm delivery
     else if (status === 'DELIVERED') {
-      const allowedRecipients = ['dealer', 'pharmacy', 'transport', 'manufacturer', 'admin'];
+      const allowedRecipients = ['dealer', 'pharmacy', 'admin'];
       if (!allowedRecipients.includes(user.role)) {
-        return res.status(403).json({ success: false, error: 'Role not allowed to confirm delivery' });
+        return res.status(403).json({ success: false, error: 'Only the receiver or admin can confirm delivery' });
       }
       box.status = 'DELIVERED';
       box.deliveredAt = new Date();

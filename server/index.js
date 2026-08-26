@@ -77,8 +77,6 @@ function mongooseConnectionState() {
 // ---------- Real-time SSE endpoint ----------
 // Clients connect with their JWT (query ?token=...) for authz.
 // The backend emits events via the eventBus; this endpoint fans them out.
-const sseClients = new Set();
-
 app.get('/api/events', (req, res) => {
   const token = req.query.token;
   let user = null;
@@ -118,11 +116,9 @@ app.get('/api/events', (req, res) => {
   };
 
   eventBus.on('sse', handler);
-  sseClients.add(res);
 
   req.on('close', () => {
     eventBus.off('sse', handler);
-    sseClients.delete(res);
     res.end();
   });
 });
