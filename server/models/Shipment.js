@@ -31,7 +31,13 @@ const shipmentSchema = new mongoose.Schema(
     // Status
     status: {
       type: String,
-      enum: ['CREATED', 'DISPATCHED', 'IN_TRANSIT', 'DELIVERED', 'DELAYED', 'CANCELLED'],
+      enum: [
+        'CREATED', 'ASSIGNED_TO_DEALER', 'DEALER_ACCEPTED',
+        'ASSIGNED_TO_TRANSPORT', 'DISPATCHED', 'PICKED_UP',
+        'IN_TRANSIT', 'OUT_FOR_DELIVERY', 'DELIVERED_TO_DEALER',
+        'ASSIGNED_TO_PHARMACY', 'DELIVERED_TO_PHARMACY', 'DELIVERED',
+        'DELAYED', 'CANCELLED',
+      ],
       default: 'CREATED',
       index: true,
     },

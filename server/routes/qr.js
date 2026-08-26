@@ -4,7 +4,7 @@
 import express from 'express';
 import Medicine from '../models/Medicine.js';
 import MedicineVerification from '../models/MedicineVerification.js';
-import { authenticate } from '../middleware/auth.js';
+import { authenticate, optionalAuthenticate } from '../middleware/auth.js';
 import { isMedicineQr, generateQrDataUrl, normalizeQrId } from '../services/qrService.js';
 import { verifyMedicineQr, saveVerification, VERDICT_LABELS } from '../services/verificationEngine.js';
 import { recordTransaction } from '../services/blockchainService.js';
@@ -80,7 +80,7 @@ router.get('/verify/:qrId', async (req, res, next) => {
  * Authentication optional - public can verify, but logged-in entities get richer context.
  * All decision logic lives in verificationEngine.js.
  */
-router.post('/verify', async (req, res, next) => {
+router.post('/verify', optionalAuthenticate, async (req, res, next) => {
   try {
     const { qrId: rawQrId, location, device, geo } = req.body;
     const qrId = normalizeQrId(rawQrId) || String(rawQrId || '').toUpperCase();

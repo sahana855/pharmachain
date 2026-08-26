@@ -23,6 +23,7 @@ import qrRoutes from './routes/qr.js';
 import shipmentRoutes from './routes/shipments.js';
 import trackingRoutes from './routes/tracking.js';
 import transportBoxRoutes from './routes/transportBox.js';
+import blockchainRoutes from './routes/blockchain.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -51,6 +52,7 @@ app.use('/api/qr', qrRoutes);
 app.use('/api/shipments', shipmentRoutes);
 app.use('/api/tracking', trackingRoutes);
 app.use('/api/transport-box', transportBoxRoutes);
+app.use('/api/blockchain', blockchainRoutes);
 app.get('/api/health', (req, res) => {
   res.json({ success: true, service: 'PharmaChain API', version: '1.0.0', time: new Date().toISOString() });
 });

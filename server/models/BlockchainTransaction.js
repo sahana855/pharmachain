@@ -13,7 +13,12 @@ const blockchainTransactionSchema = new mongoose.Schema(
     // The event
     eventType: {
       type: String,
-      enum: ['MEDICINE_REGISTERED', 'MEDICINE_VERIFIED', 'SHIPMENT_CREATED', 'SHIPMENT_STATUS', 'TRACKING_EVENT', 'USER_REGISTERED', 'USER_APPROVED', 'RECALL'],
+      enum: [
+        'MEDICINE_REGISTERED', 'MEDICINE_VERIFIED', 'SHIPMENT_CREATED',
+        'SHIPMENT_STATUS', 'TRACKING_EVENT', 'USER_REGISTERED', 'USER_APPROVED',
+        'RECALL', 'BOX_CREATED', 'BOX_LOCATION', 'BOX_STATUS', 'DEALER_ACCEPTED',
+        'PHARMACY_RECEIVED',
+      ],
       required: true,
       index: true,
     },

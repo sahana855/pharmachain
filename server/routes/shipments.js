@@ -2,6 +2,7 @@
 // Shipment QR is SEPARATE from medicine QR: /track/SHIP-XXX vs /verify/MED-XXX
 import express from 'express';
 import Shipment from '../models/Shipment.js';
+import Medicine from '../models/Medicine.js';
 import TrackingEvent from '../models/TrackingEvent.js';
 import User from '../models/User.js';
 import { authenticate } from '../middleware/auth.js';
@@ -11,6 +12,56 @@ import { recordTransaction } from '../services/blockchainService.js';
 import { emitEvent } from '../services/eventBus.js';
 
 const router = express.Router();
+
+const STATUS_TRANSITIONS = {
+  CREATED: ['ASSIGNED_TO_DEALER', 'DISPATCHED', 'CANCELLED'],
+  ASSIGNED_TO_DEALER: ['DEALER_ACCEPTED', 'CANCELLED'],
+  DEALER_ACCEPTED: ['ASSIGNED_TO_TRANSPORT', 'CANCELLED'],
+  ASSIGNED_TO_TRANSPORT: ['PICKED_UP', 'DISPATCHED', 'CANCELLED'],
+  DISPATCHED: ['PICKED_UP', 'IN_TRANSIT', 'CANCELLED'],
+  PICKED_UP: ['IN_TRANSIT', 'OUT_FOR_DELIVERY', 'CANCELLED'],
+  IN_TRANSIT: ['OUT_FOR_DELIVERY', 'DELIVERED', 'DELIVERED_TO_DEALER', 'DELIVERED_TO_PHARMACY', 'DELAYED'],
+  OUT_FOR_DELIVERY: ['DELIVERED', 'DELIVERED_TO_DEALER', 'DELIVERED_TO_PHARMACY', 'DELAYED'],
+  DELIVERED_TO_DEALER: ['ASSIGNED_TO_PHARMACY', 'CANCELLED'],
+  ASSIGNED_TO_PHARMACY: ['IN_TRANSIT', 'OUT_FOR_DELIVERY', 'CANCELLED'],
+  DELAYED: ['IN_TRANSIT', 'OUT_FOR_DELIVERY', 'DELIVERED', 'DELIVERED_TO_DEALER', 'DELIVERED_TO_PHARMACY', 'CANCELLED'],
+  DELIVERED: [],
+  DELIVERED_TO_PHARMACY: [],
+  CANCELLED: [],
+};
+
+function canViewShipment(shipment, user) {
+  if (user.role === 'admin') return true;
+  const userId = user.id;
+  return [shipment.fromId, shipment.toId, shipment.transportId].some((id) => id && id.toString() === userId);
+}
+
+async function validateShipmentItems(items, user) {
+  const medicineIds = items.map((item) => item.medicineId).filter(Boolean);
+  if (medicineIds.length !== items.length) {
+    throw Object.assign(new Error('Every shipment item must reference a medicine'), { status: 400 });
+  }
+  const medicines = await Medicine.find({ _id: { $in: medicineIds } });
+  if (medicines.length !== medicineIds.length) {
+    throw Object.assign(new Error('One or more medicines were not found'), { status: 400 });
+  }
+  if (user.role === 'manufacturer') {
+    const foreign = medicines.find((medicine) => medicine.manufacturerId.toString() !== user.id);
+    if (foreign) throw Object.assign(new Error('Manufacturers can only ship medicines they created'), { status: 403 });
+  }
+  if (user.role === 'dealer') {
+    const delivered = await Shipment.find({
+      toId: user.id,
+      toRole: 'dealer',
+      status: { $in: ['DELIVERED', 'DELIVERED_TO_DEALER'] },
+      'items.medicineId': { $in: medicineIds },
+    }).select('items.medicineId');
+    const receivedIds = new Set(delivered.flatMap((shipment) => shipment.items.map((item) => item.medicineId?.toString())));
+    const unavailable = medicineIds.find((id) => !receivedIds.has(id.toString()));
+    if (unavailable) throw Object.assign(new Error('Dealers can only distribute medicines received from a manufacturer'), { status: 403 });
+  }
+  return medicines;
+}
 
 // Helper: add tracking event
 async function addTrackingEvent(shipment, type, description, opts = {}) {
@@ -55,6 +106,14 @@ router.post('/', authenticate, authorize('manufacturer', 'dealer'), async (req, 
 
     const toUser = await User.findById(toId);
     if (!toUser) return res.status(404).json({ success: false, error: 'Destination user not found' });
+    if (req.user.role === 'manufacturer' && toUser.role !== 'dealer') {
+      return res.status(400).json({ success: false, error: 'Manufacturers can only ship to dealers' });
+    }
+    if (req.user.role === 'dealer' && toUser.role !== 'pharmacy') {
+      return res.status(400).json({ success: false, error: 'Dealers can only ship to pharmacies' });
+    }
+
+    await validateShipmentItems(items, req.user);
 
     const totalAmount = items.reduce((sum, it) => sum + (it.price || 0) * (it.quantity || 0), 0);
     const shipmentQrId = generateShipmentQrToken();
@@ -81,7 +140,7 @@ router.post('/', authenticate, authorize('manufacturer', 'dealer'), async (req, 
       transportId: transport ? transport.id : undefined,
       transportName: transport ? transport.name : undefined,
       expectedDelivery,
-      status: 'CREATED',
+      status: req.user.role === 'manufacturer' ? 'ASSIGNED_TO_DEALER' : 'ASSIGNED_TO_PHARMACY',
     });
 
     await addTrackingEvent(shipment, 'CREATED', `Shipment created by ${req.user.name}`, {
@@ -173,6 +232,7 @@ router.get('/:id', authenticate, async (req, res, next) => {
   try {
     const shipment = await Shipment.findById(req.params.id);
     if (!shipment) return res.status(404).json({ success: false, error: 'Shipment not found' });
+    if (!canViewShipment(shipment, req.user)) return res.status(403).json({ success: false, error: 'Not authorized for this shipment' });
     const events = await TrackingEvent.find({ shipmentId: shipment._id }).sort({ createdAt: 1 });
     res.json({ success: true, shipment, events });
   } catch (err) {
@@ -186,6 +246,12 @@ const assignTransportHandler = async (req, res, next) => {
     const { transportId } = req.body;
     const shipment = await Shipment.findById(req.params.id);
     if (!shipment) return res.status(404).json({ success: false, error: 'Shipment not found' });
+    if (req.user.role !== 'admin' && shipment.fromId.toString() !== req.user.id) {
+      return res.status(403).json({ success: false, error: 'Only the shipment owner can assign transport' });
+    }
+    if (!['CREATED', 'DEALER_ACCEPTED', 'ASSIGNED_TO_PHARMACY'].includes(shipment.status)) {
+      return res.status(409).json({ success: false, error: `Transport cannot be assigned from ${shipment.status}` });
+    }
 
     const transport = await User.findById(transportId);
     if (!transport || transport.role !== 'transport') {
@@ -194,7 +260,7 @@ const assignTransportHandler = async (req, res, next) => {
 
     shipment.transportId = transport.id;
     shipment.transportName = transport.name;
-    shipment.status = shipment.status === 'CREATED' ? 'DISPATCHED' : shipment.status;
+    shipment.status = shipment.status === 'CREATED' ? 'ASSIGNED_TO_TRANSPORT' : shipment.status;
     await shipment.save();
 
        await addTrackingEvent(shipment, 'DISPATCHED', `Shipment dispatched via ${transport.name}`, {
@@ -230,11 +296,26 @@ router.post('/:id/assign', authenticate, authorize('manufacturer', 'dealer', 'ad
 const updateStatusHandler = async (req, res, next) => {
   try {
     const { status, location, delay } = req.body;
-    const valid = ['CREATED', 'DISPATCHED', 'IN_TRANSIT', 'DELIVERED', 'DELAYED', 'CANCELLED'];
+    const valid = Object.keys(STATUS_TRANSITIONS);
     if (!valid.includes(status)) return res.status(400).json({ success: false, error: 'Invalid status' });
 
     const shipment = await Shipment.findById(req.params.id);
     if (!shipment) return res.status(404).json({ success: false, error: 'Shipment not found' });
+
+    if (req.user.role === 'transport' && (!shipment.transportId || shipment.transportId.toString() !== req.user.id)) {
+      return res.status(403).json({ success: false, error: 'Only the assigned transport agent can update logistics' });
+    }
+    if (req.user.role === 'dealer' && shipment.toId.toString() !== req.user.id) {
+      return res.status(403).json({ success: false, error: 'Only the destination dealer can update this shipment' });
+    }
+    if (req.user.role === 'pharmacy' && shipment.toId.toString() !== req.user.id) {
+      return res.status(403).json({ success: false, error: 'Only the destination pharmacy can update this shipment' });
+    }
+
+    const allowedNext = STATUS_TRANSITIONS[shipment.status] || [];
+    if (req.user.role !== 'admin' && !allowedNext.includes(status)) {
+      return res.status(409).json({ success: false, error: `Invalid status transition: ${shipment.status} -> ${status}` });
+    }
 
     // Authorization: transport assigned, or creator, or admin
     const isCreator = shipment.fromId.toString() === req.user.id;
@@ -283,6 +364,24 @@ const updateStatusHandler = async (req, res, next) => {
 };
 router.patch('/:id/status', authenticate, updateStatusHandler);
 router.post('/:id/status', authenticate, updateStatusHandler);
+
+// POST /api/shipments/:id/accept - destination dealer or pharmacy accepts delivery
+router.post('/:id/accept', authenticate, authorize('dealer', 'pharmacy'), async (req, res, next) => {
+  try {
+    const shipment = await Shipment.findById(req.params.id);
+    if (!shipment) return res.status(404).json({ success: false, error: 'Shipment not found' });
+    if (shipment.toId.toString() !== req.user.id) return res.status(403).json({ success: false, error: 'Only the destination can accept this shipment' });
+    const expected = req.user.role === 'dealer' ? ['ASSIGNED_TO_DEALER', 'DELIVERED_TO_DEALER', 'DELIVERED'] : ['ASSIGNED_TO_PHARMACY', 'DELIVERED_TO_PHARMACY', 'DELIVERED'];
+    if (!expected.includes(shipment.status)) return res.status(409).json({ success: false, error: `Shipment cannot be accepted from ${shipment.status}` });
+    shipment.status = req.user.role === 'dealer' ? 'DEALER_ACCEPTED' : 'DELIVERED_TO_PHARMACY';
+    await shipment.save();
+    await addTrackingEvent(shipment, shipment.status, `Shipment accepted by ${req.user.name}`, { updatedById: req.user.id, updatedByName: req.user.name, updatedByRole: req.user.role });
+    const chain = await recordTransaction(req.user.role === 'dealer' ? 'DEALER_ACCEPTED' : 'PHARMACY_RECEIVED', { shipmentId: String(shipment._id), shipmentQrId: shipment.shipmentQrId, userId: req.user.id, payload: { status: shipment.status } });
+    res.json({ success: true, shipment, chain });
+  } catch (err) {
+    next(err);
+  }
+});
 
 export default router;
 

@@ -117,6 +117,9 @@ router.get('/timeline/:shipmentId', authenticate, async (req, res, next) => {
   try {
     const shipment = await Shipment.findById(req.params.shipmentId);
     if (!shipment) return res.status(404).json({ success: false, error: 'Shipment not found' });
+    if (req.user.role !== 'admin' && ![shipment.fromId, shipment.toId, shipment.transportId].some((id) => id && id.toString() === req.user.id)) {
+      return res.status(403).json({ success: false, error: 'Not authorized for this shipment' });
+    }
 
     const events = await TrackingEvent.find({ shipmentId: shipment._id }).sort({ createdAt: 1 });
     res.json({ success: true, shipment, events });

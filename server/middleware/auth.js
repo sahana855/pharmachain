@@ -36,3 +36,22 @@ export async function authenticate(req, res, next) {
   }
 }
 
+// Attach a valid user when a bearer token is supplied, while keeping public QR verification public.
+export async function optionalAuthenticate(req, res, next) {
+  try {
+    const header = req.headers.authorization || '';
+    const token = header.startsWith('Bearer ') ? header.slice(7) : null;
+    if (!token) return next();
+    const decoded = jwt.verify(token, env.JWT_SECRET);
+    if (!decoded?.id) return next();
+    const user = await User.findById(decoded.id);
+    if (user) {
+      req.user = user;
+      req.userId = user._id.toString();
+    }
+  } catch {
+    // Public verification should not fail because an optional token is stale.
+  }
+  next();
+}
+

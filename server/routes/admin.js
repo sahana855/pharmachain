@@ -4,6 +4,8 @@ import MedicineCatalog from '../models/MedicineCatalog.js';
 import Medicine from '../models/Medicine.js';
 import Shipment from '../models/Shipment.js';
 import User from '../models/User.js';
+import BlockchainTransaction from '../models/BlockchainTransaction.js';
+import MedicineVerification from '../models/MedicineVerification.js';
 import { authenticate } from '../middleware/auth.js';
 import { authorize } from '../middleware/role.js';
 import { importCdscoCatalog, INITIAL_CDSCO_CATALOG } from '../services/cdscoImportService.js';
@@ -65,14 +67,36 @@ router.get('/catalog', async (req, res, next) => {
 // GET /api/admin/stats - System overview counts
 router.get('/stats', async (req, res, next) => {
   try {
-    const [users, pendingUsers, medicines, catalog, shipments] = await Promise.all([
+    const [users, pendingUsers, manufacturers, dealers, transport, pharmacies, medicines, shipments, verifiedMedicines, suspiciousMedicines, blockchainTransactions] = await Promise.all([
       User.countDocuments({ role: { $ne: 'admin' } }),
       User.countDocuments({ role: { $ne: 'admin' }, verificationStatus: 'pending' }),
+      User.countDocuments({ role: 'manufacturer' }),
+      User.countDocuments({ role: 'dealer' }),
+      User.countDocuments({ role: 'transport' }),
+      User.countDocuments({ role: 'pharmacy' }),
       Medicine.countDocuments(),
-      MedicineCatalog.countDocuments(),
       Shipment.countDocuments(),
+      MedicineVerification.countDocuments({ result: { $in: ['GREEN', 'BLUE'] } }),
+      MedicineVerification.countDocuments({ result: { $in: ['ORANGE', 'RED'] } }),
+      BlockchainTransaction.countDocuments(),
     ]);
-    res.json({ success: true, stats: { users, pendingUsers, medicines, catalog, shipments } });
+    const catalog = await MedicineCatalog.countDocuments();
+    res.json({ success: true, stats: { users, pendingUsers, manufacturers, dealers, transport, pharmacies, medicines, catalog, shipments, verifiedMedicines, suspiciousMedicines, blockchainTransactions } });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/admin/ledger - immutable ledger view for administrators
+router.get('/ledger', async (req, res, next) => {
+  try {
+    const { eventType, medicineId, shipmentId } = req.query;
+    const filter = {};
+    if (eventType) filter.eventType = eventType;
+    if (medicineId) filter.medicineId = medicineId;
+    if (shipmentId) filter.shipmentId = shipmentId;
+    const items = await BlockchainTransaction.find(filter).sort({ blockNumber: -1, timestamp: -1 }).limit(500);
+    res.json({ success: true, count: items.length, items });
   } catch (err) {
     next(err);
   }
