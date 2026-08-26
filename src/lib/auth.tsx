@@ -134,9 +134,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!res.ok) {
         return { success: false, error: data?.error || data?.message || 'Login failed' };
       }
-      // Server sends OTP and a message — do not set token here
-      storePendingOtp(email.trim());
-      return { success: true, message: data?.message || 'OTP sent' };
+      if (data.token) {
+        setToken(data.token);
+        setUser(data.user || null);
+        try { await fetchPendingVerifications(); } catch {}
+        return { success: true };
+      }
+      return { success: false, error: 'Login did not return a token' };
     } catch (err: any) {
       return { success: false, error: err?.message || 'Login failed' };
     }

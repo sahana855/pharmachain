@@ -75,7 +75,7 @@ router.post('/register', authLimiter, async (req, res, next) => {
 });
 
 // Public: POST /api/auth/login
-// Step 1: verify credentials and send OTP to email (do not issue final JWT here)
+// Verify credentials and issue JWT directly (no OTP)
 router.post('/login', authLimiter, async (req, res, next) => {
   try {
     const { email, password } = req.body;
@@ -84,7 +84,7 @@ router.post('/login', authLimiter, async (req, res, next) => {
     }
 
     const normalizedEmail = String(email).trim().toLowerCase();
-    const user = await User.findOne({ email: normalizedEmail }).select('+password +otp +otpExpires +otpAttempts');
+    const user = await User.findOne({ email: normalizedEmail }).select('+password');
     if (!user || !(await user.comparePassword(password))) {
       return res.status(401).json({ success: false, error: 'Invalid email or password' });
     }
@@ -96,30 +96,18 @@ router.post('/login', authLimiter, async (req, res, next) => {
       return res.status(403).json({ success: false, error: '✋ Your account was rejected. Please contact admin support.' });
     }
 
-    const otp = String(Math.floor(100000 + Math.random() * 900000));
-    const hashedOtp = await bcrypt.hash(otp, 10);
-    user.otp = hashedOtp;
-    user.otpExpires = new Date(Date.now() + 5 * 60 * 1000);
-    user.otpAttempts = 0;
-    await user.save();
-
-    try {
-      await sendMail({ to: user.email, ...buildOtpEmail(otp) });
-    } catch (mailErr) {
-      console.error('Failed to send OTP email', mailErr);
-      const devDetail = env.NODE_ENV === 'development'
-        ? (mailErr?.message || 'Could not send the login code to your email.')
-        : 'Could not send the login code to your email. Please try again.';
-      return res.status(503).json({
-        success: false,
-        error: devDetail,
-        ...(env.NODE_ENV === 'development' ? { mailError: mailErr?.message, code: mailErr?.code } : {}),
-      });
-    }
-
+    const token = signToken(user);
     return res.json({
       success: true,
-      message: `A 6-digit login code was sent to ${user.email}. It expires in 5 minutes.`,
+      message: 'Login successful',
+      token,
+      user: {
+        id: user._id.toString(),
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        verificationStatus: user.verificationStatus,
+      },
     });
   } catch (err) {
     next(err);

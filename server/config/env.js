@@ -55,5 +55,8 @@ export const env = {
   MAILER_SERVICE: envStr('MAILER_SERVICE'),
   MAILER_FROM: envStr('MAILER_FROM'),
   ALLOW_DEMO_LOGIN: envStr('ALLOW_DEMO_LOGIN', 'false').toLowerCase() === 'true',
+  API_RATE_LIMIT_MAX: parseInt(process.env.API_RATE_LIMIT_MAX || '10000', 10),
+  AUTH_RATE_LIMIT_MAX: parseInt(process.env.AUTH_RATE_LIMIT_MAX || '30', 10),
+  VERIFY_RATE_LIMIT_MAX: parseInt(process.env.VERIFY_RATE_LIMIT_MAX || '20', 10),
 };
 
