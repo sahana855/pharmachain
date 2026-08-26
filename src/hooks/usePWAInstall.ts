@@ -11,6 +11,7 @@ interface PWAInstallState {
   isInstalled: boolean;      // already running as installed app
   isIOS: boolean;            // iOS Safari (needs Add to Home Screen)
   showInstallPrompt: () => Promise<void>;  // trigger install prompt
+  openInBrowser: () => void; // open current URL in browser from standalone mode
   deferredPrompt: BeforeInstallPromptEvent | null;
 }
 
@@ -59,11 +60,17 @@ export function usePWAInstall(): PWAInstallState {
     }
   }, [deferredPrompt]);
 
+  const openInBrowser = useCallback(() => {
+    const currentUrl = window.location.href;
+    window.open(currentUrl, '_blank');
+  }, []);
+
   return {
     canInstall: !!deferredPrompt,
     isInstalled,
     isIOS,
     showInstallPrompt,
+    openInBrowser,
     deferredPrompt,
   };
 }

@@ -1,13 +1,11 @@
 import { useState } from 'react';
-import { Download, Smartphone, X } from 'lucide-react';
+import { Download, Smartphone, X, Globe } from 'lucide-react';
 import { usePWAInstall } from '../hooks/usePWAInstall';
 
 export default function InstallAppButton() {
-  const { canInstall, isInstalled, isIOS, showInstallPrompt } = usePWAInstall();
+  const { canInstall, isInstalled, isIOS, showInstallPrompt, openInBrowser } = usePWAInstall();
   const [showIOSTip, setShowIOSTip] = useState(false);
-
-  // If app is already installed, hide the button
-  if (isInstalled) return null;
+  const [showBrowserTip, setShowBrowserTip] = useState(false);
 
   // iOS Safari doesn't support beforeinstallprompt - show "Add to Home Screen" tip
   if (isIOS) {
@@ -23,7 +21,7 @@ export default function InstallAppButton() {
         </button>
 
         {showIOSTip && (
-          <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowIOSTip(false)}>
+          <div className="fixed inset-0 z-[100] bg-black/50 backdrop:blur-sm flex items-center justify-center p-4" onClick={() => setShowIOSTip(false)}>
             <div className="glass-card-solid max-w-sm w-full p-6 rounded-2xl" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-start justify-between mb-3">
                 <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center">
@@ -40,6 +38,48 @@ export default function InstallAppButton() {
                 <li>Tap <strong>Add</strong> in the top right</li>
               </ol>
               <p className="text-xs text-gray-400">PharmaChain will appear on your home screen like a native app.</p>
+            </div>
+          </div>
+        )}
+      </>
+    );
+  }
+
+  // If app is already installed in standalone mode, show option to open in browser
+  if (isInstalled) {
+    return (
+      <>
+        <button
+          onClick={() => setShowBrowserTip(!showBrowserTip)}
+          className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 rounded-xl transition-all"
+          title="Open in Browser"
+        >
+          <Globe size={16} />
+          <span className="hidden sm:block">Open in Browser</span>
+        </button>
+
+        {showBrowserTip && (
+          <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowBrowserTip(false)}>
+            <div className="glass-card-solid max-w-sm w-full p-6 rounded-2xl" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-start justify-between mb-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center">
+                  <Globe size={20} className="text-white" />
+                </div>
+                <button onClick={() => setShowBrowserTip(false)} className="text-gray-400 hover:text-gray-600">
+                  <X size={18} />
+                </button>
+              </div>
+              <h3 className="text-lg font-bold text-gray-900 mb-2">Open in Browser</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                You can open PharmaChain in your browser anytime. The installed app and browser version both use the same data.
+              </p>
+              <button
+                onClick={() => { openInBrowser(); setShowBrowserTip(false); }}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-primary-500 to-indigo-600 rounded-xl shadow-md"
+              >
+                <Globe size={16} />
+                Open PharmaChain in Browser
+              </button>
             </div>
           </div>
         )}

@@ -6,6 +6,7 @@ const { app, BrowserWindow, shell, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const http = require('http');
+const { spawn } = require('child_process');
 
 const BACKEND_URL = process.env.PHARMACHAIN_BACKEND_URL || 'http://127.0.0.1:41837';
 const BACKEND_HOST = '127.0.0.1';
@@ -110,11 +111,26 @@ if (!gotLock) {
       return;
     }
 
-    // Wait for the Express+MongoDB backend to be ready
+    // Wait for the Express+MongoDB backend to be ready (try to auto-start it if missing)
     let ready = await isBackendRunning();
+    let backendProc = null;
+
     if (!ready) {
+      // Try to start the backend using node server/index.js
+      try {
+        const serverPath = path.join(__dirname, '..');
+        backendProc = spawn(process.execPath || 'node', ['server/index.js'], {
+          cwd: serverPath,
+          env: process.env,
+          stdio: 'inherit',
+        });
+      } catch (err) {
+        backendProc = null;
+      }
+
+      // Wait up to 20s for backend to respond
       let attempts = 0;
-      while (!ready && attempts < 10) {
+      while (!ready && attempts < 20) {
         await new Promise((r) => setTimeout(r, 1000));
         attempts += 1;
         ready = await isBackendRunning();
@@ -122,14 +138,27 @@ if (!gotLock) {
     }
 
     if (!ready) {
+      if (backendProc) {
+        try { backendProc.kill(); } catch {}
+      }
       dialog.showErrorBox(
         'Backend not running',
-        'The PharmaChain backend (Express + MongoDB) is not reachable on port 41837.\n\n' +
-          'Please start it first:  npm run dev:server\n' +
-          '(Windows users can double-click start.bat which starts everything).'
+        'The PharmaChain backend (Express + MongoDB) was not reachable on port 41837 and could not be started automatically.\n\n' +
+          'Please start it manually in the project folder: npm run dev:server\n' +
+          'Or use start.bat to start both the backend and the desktop app.'
       );
       app.quit();
       return;
+    }
+
+    // If we started a backend process here, ensure it is terminated when the app quits
+    if (backendProc) {
+      app.on('before-quit', () => {
+        try { backendProc.kill(); } catch {}
+      });
+      process.on('exit', () => {
+        try { backendProc.kill(); } catch {}
+      });
     }
 
     createWindow();
