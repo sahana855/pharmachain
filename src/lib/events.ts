@@ -5,7 +5,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { getToken } from './api';
 
-type EventHandler = (data: any) => void;
+type EventHandler = (data: unknown) => void;
 
 export type LiveEventType =
   | 'shipment_created'
@@ -51,7 +51,9 @@ function ensureConnected(): EventSource {
         if (set) {
           set.forEach((cb) => cb(data));
         }
-      } catch {}
+      } catch {
+        // parse error — ignore malformed SSE data
+      }
     });
   });
 
@@ -106,7 +108,7 @@ interface UseLiveEventsResult {
 }
 
 export function useLiveEvents(
-  handler: (eventType: LiveEventType, data: any) => void
+  handler: (eventType: LiveEventType, data: unknown) => void
 ): UseLiveEventsResult {
   const handlerRef = useRef(handler);
   handlerRef.current = handler;
@@ -115,7 +117,7 @@ export function useLiveEvents(
   useEffect(() => {
     setConnected(false);
 
-    const wrappedHandler = (eventType: LiveEventType, data: any) => {
+    const wrappedHandler = (eventType: LiveEventType, data: unknown) => {
       handlerRef.current(eventType, data);
     };
 
@@ -165,7 +167,7 @@ export function useLiveSync(callback: () => void): UseLiveSyncResult {
   const [connected, setConnected] = useState(false);
 
   useEffect(() => {
-    const handler = (eventType: LiveEventType, _data: any) => {
+    const handler = (eventType: LiveEventType) => {
       if (eventType === 'connected') {
         setConnected(true);
       } else {
@@ -179,7 +181,7 @@ export function useLiveSync(callback: () => void): UseLiveSyncResult {
       if (type === 'connected') {
         unsubs.push(subscribeToEvent(type, () => setConnected(true)));
       } else {
-        unsubs.push(subscribeToEvent(type, () => handler(type, undefined)));
+        unsubs.push(subscribeToEvent(type, () => handler(type)));
       }
     });
 
