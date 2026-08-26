@@ -120,7 +120,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string): Promise<AuthResult> => {
     try {
       const res = await fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: email.trim(), password }) });
-      const data = await res.json();
+      const responseText = await res.text();
+      let data: any = null;
+      try {
+        data = responseText ? JSON.parse(responseText) : null;
+      } catch {
+        return {
+          success: false,
+          error: 'The deployed API returned an HTML page instead of JSON. Configure the Vercel API function and redeploy.',
+        };
+      }
       if (!res.ok) {
         return { success: false, error: data?.error || data?.message || 'Login failed' };
       }

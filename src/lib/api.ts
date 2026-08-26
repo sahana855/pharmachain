@@ -61,15 +61,24 @@ async function request<T = any>(path: string, opts: RequestOptions = {}): Promis
   }
 
   let data: any = null;
+  let responseText = '';
   try {
-    data = await res.json();
+    responseText = await res.text();
+    data = responseText ? JSON.parse(responseText) : null;
   } catch {
-    // non-JSON response
+    // Keep the raw response so deployment errors are actionable.
   }
 
   if (!res.ok) {
-    const message = data?.error || data?.message || `Request failed (${res.status})`;
+    const htmlResponse = responseText.trim().startsWith('<') || responseText.startsWith('The page');
+    const message = data?.error || data?.message || (htmlResponse
+      ? `The API endpoint is not available on this deployment (${res.status}). Check the Vercel serverless API configuration.`
+      : `Request failed (${res.status})`);
     throw new ApiError(message, res.status);
+  }
+
+  if (data === null) {
+    throw new ApiError('The server returned an invalid non-JSON response. Check the deployment API configuration.', res.status);
   }
 
   return data as T;

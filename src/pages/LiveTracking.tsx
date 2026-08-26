@@ -7,22 +7,36 @@ import { useNavigate } from 'react-router-dom';
 import { shipmentApi, transportBoxApi } from '../lib/api';
 import { useLiveSync } from '../lib/events';
 import {
-  Truck, Package, MapPin, CheckCircle, AlertTriangle, Clock,
+  Truck, Package, MapPin, CheckCircle, AlertTriangle,
   ArrowRight, RefreshCw, Waypoints, Boxes, Globe, Activity,
 } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
-import ShipmentTimeline from '../components/ShipmentTimeline';
 
 type Tab = 'shipments' | 'boxes';
+
+type ShipmentData = Record<string, unknown> & {
+  _id?: string; id?: string; shipmentNumber: string; shipmentQrId: string;
+  status: string; fromName?: string; toName?: string; currentLocation?: string;
+  transportName?: string; delayAlert?: boolean; deliveredAt?: string;
+  expectedDelivery?: string; routePath?: string; locationUpdatedAt?: string;
+  isDemo?: boolean; items?: Array<Record<string, unknown>>; totalAmount?: number;
+};
+type BoxData = Record<string, unknown> & {
+  _id?: string; boxId: string; status: string; source?: string; destination?: string;
+  currentLocation?: string; transporterName?: string; vehicleNumber?: string;
+  medicineNames?: string[]; quantity?: number; delayAlert?: boolean;
+  deliveredAt?: string; expectedDeliveryDate?: string; isDemo?: boolean;
+  locationUpdatedAt?: string;
+};
 
 export default function LiveTracking() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<Tab>('shipments');
-  const [shipments, setShipments] = useState<any[]>([]);
-  const [boxes, setBoxes] = useState<any[]>([]);
+  const [shipments, setShipments] = useState<ShipmentData[]>([]);
+  const [boxes, setBoxes] = useState<BoxData[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -38,22 +52,22 @@ export default function LiveTracking() {
         transportBoxApi.list(),
       ]);
 
-      const userShipments = (shipData.items || []).filter((s: any) => {
-        const matchesFrom = s.fromId === user?.id || s.fromId?._id === user?.id;
-        const matchesTo = s.toId === user?.id || s.toId?._id === user?.id;
-        const matchesTransport = s.transportId === user?.id || s.transportId?._id === user?.id;
+      const userShipments: ShipmentData[] = (shipData.items || []).filter((s: ShipmentData) => {
+        const matchesFrom = s.fromId === user?.id || s.fromId?.toString() === user?.id;
+        const matchesTo = s.toId === user?.id || s.toId?.toString() === user?.id;
+        const matchesTransport = s.transportId === user?.id || s.transportId?.toString() === user?.id;
         return user?.role === 'admin' ? true : matchesFrom || matchesTo || matchesTransport;
       });
 
-      const userBoxes = (boxData.boxes || []).filter((b: any) => {
+      const userBoxes: BoxData[] = (boxData.boxes || []).filter((b: BoxData) => {
         const matches = ['manufacturerId', 'dealerId', 'transporterId']
-          .some(k => b[k] === user?.id || b[k]?._id === user?.id);
+          .some(k => (b as Record<string, unknown>)[k] === user?.id || (b as Record<string, unknown>)[k]?.toString() === user?.id);
         return user?.role === 'admin' ? true : matches;
       });
 
       setShipments(userShipments);
       setBoxes(userBoxes);
-    } catch (e) {
+    } catch (e: unknown) {
       console.error('Failed to load tracking data:', e);
     } finally {
       setLoading(false);
@@ -297,22 +311,25 @@ export default function LiveTracking() {
                       <MapPin size={10} /> {box.currentLocation}
                     </div>
                   )}
-                  {box.transporterName && (
-                    <div className="flex items-center gap-1 text-xs text-gray-400 mt-1">
-                      <Truck size={10} /> {box.transporterName} · {box.vehicleNumber}
-                    </div>
-                  )}
-                  {box.medicineNames?.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {box.medicineNames.slice(0, 3).map((name: string, i: number) => (
-                        <span key={i} className="text-xs bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded">{name}</span>
-                      ))}
-                      {box.medicineNames.length > 3 && (
-                        <span className="text-xs text-gray-400">+{box.medicineNames.length - 3} more</span>
-                      )}
-                    </div>
-                  )}
-                  {box.delayAlert && (
+                   {box.transporterName && (
+                     <div className="flex items-center gap-1 text-xs text-gray-400 mt-1">
+                       <Truck size={10} /> {box.transporterName} · {box.vehicleNumber}
+                     </div>
+                   )}
+                   {box.medicineNames && box.medicineNames.length > 0 && (() => {
+                     const names = box.medicineNames;
+                     return (
+                       <div className="flex flex-wrap gap-1 mt-1">
+                         {names.slice(0, 3).map((name: string, i: number) => (
+                           <span key={i} className="text-xs bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded">{name}</span>
+                         ))}
+                         {names.length > 3 && (
+                           <span className="text-xs text-gray-400">+{names.length - 3} more</span>
+                         )}
+                       </div>
+                     );
+                   })()}
+                   {box.delayAlert && (
                     <div className="mt-1 text-xs text-red-600 flex items-center gap-1">
                       <AlertTriangle size={10} /> Delay alert flagged
                     </div>

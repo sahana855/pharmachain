@@ -1,0 +1,20 @@
+# Vercel Setup
+
+The project now deploys the Express API through `api/[...path].js`. Configure these Vercel environment variables before deploying:
+
+- `MONGODB_URI`
+- `JWT_SECRET`
+- `MAILER_HOST`
+- `MAILER_PORT`
+- `MAILER_SECURE`
+- `MAILER_USER`
+- `MAILER_PASS`
+- `MAILER_FROM`
+
+For non-zero demo dashboards, run the enhanced seed against the same MongoDB database used by Vercel:
+
+```bash
+npm run seed
+```
+
+The seed creates demo users, medicines, shipments, transport boxes, tracking events, and verification records. It clears the configured database first, so use it only with a development/demo database.

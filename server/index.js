@@ -143,6 +143,8 @@ if (fs.existsSync(distDir)) {
 app.use(notFound);
 app.use(errorHandler);
 
+export { app };
+
 // ---------- Start ----------
 async function start() {
   try {
@@ -170,5 +172,6 @@ async function start() {
   }
 }
 
-start();
+const isDirectRun = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (isDirectRun) start();
 
