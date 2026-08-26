@@ -1,9 +1,10 @@
 import { useAuth } from '../lib/auth';
 import { useNavigate } from 'react-router-dom';
-import { LogOut, User, Bell, Menu, X, Pill, LayoutDashboard, ScanLine } from 'lucide-react';
+import { LogOut, User, Bell, Menu, X, Pill, ScanLine } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { getDB } from '../lib/db';
 import InstallAppButton from './InstallAppButton';
+import { roleNavItems } from './Sidebar';
 
 export default function Navbar() {
   const { user, logout } = useAuth();
@@ -28,6 +29,8 @@ export default function Navbar() {
     logout();
     navigate('/login');
   };
+
+  const navItems = user ? roleNavItems[user.role] || [] : [];
 
   const roleColors: Record<string, string> = {
     manufacturer: 'from-blue-500 to-indigo-600',
@@ -109,12 +112,20 @@ export default function Navbar() {
               <p className="text-gray-400 capitalize text-xs font-medium">{user?.role}</p>
             </div>
           </div>
-          <button
-            onClick={() => { navigate('/dashboard'); setMobileMenuOpen(false); }}
-            className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-gray-600 hover:bg-gray-50 rounded-xl transition"
-          >
-            <LayoutDashboard size={16} /> Dashboard
-          </button>
+          <div className="space-y-1">
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              return (
+                <button
+                  key={item.path}
+                  onClick={() => { navigate(item.path); setMobileMenuOpen(false); }}
+                  className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-gray-600 hover:bg-gray-50 rounded-xl transition"
+                >
+                  <Icon size={16} /> {item.label}
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
     </nav>

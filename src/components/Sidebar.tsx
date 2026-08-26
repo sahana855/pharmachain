@@ -9,13 +9,13 @@ import {
   ChevronRight, Boxes, Waypoints, Navigation
 } from 'lucide-react';
 
-type RoleNavItem = {
+export type RoleNavItem = {
   label: string;
   icon: any;
   path: string;
 };
 
-const roleNavItems: Record<string, RoleNavItem[]> = {
+export const roleNavItems: Record<string, RoleNavItem[]> = {
   manufacturer: [
     { label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard/manufacturer' },
     { label: 'Live Tracking', icon: Navigation, path: '/scan' },
