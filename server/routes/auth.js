@@ -53,7 +53,7 @@ router.post('/register', authLimiter, async (req, res, next) => {
       password,
       name,
       role: normalizedRole,
-      verificationStatus: 'pending', // all non-admin require admin approval
+      verificationStatus: 'verified', // Admin approval removed
       aadharNumber,
       businessLicense,
       idProofType,
@@ -66,7 +66,7 @@ router.post('/register', authLimiter, async (req, res, next) => {
 
     res.status(201).json({
       success: true,
-      message: 'Registration submitted! Wait for admin approval before logging in.',
+      message: 'Registration successful! You can now log in.',
       user: { id: user._id, email: user.email, name: user.name, role: user.role, verificationStatus: user.verificationStatus },
     });
   } catch (err) {
