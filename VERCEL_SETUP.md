@@ -2,7 +2,7 @@
 
 The project now deploys the Express API through `api/[...path].js`. Configure these Vercel environment variables before deploying:
 
-- `MONGODB_URI`
+- `MONGODB_URI` — your MongoDB Atlas connection string
 - `JWT_SECRET`
 - `MAILER_HOST`
 - `MAILER_PORT`
@@ -10,6 +10,8 @@ The project now deploys the Express API through `api/[...path].js`. Configure th
 - `MAILER_USER`
 - `MAILER_PASS`
 - `MAILER_FROM`
+
+Add `MONGODB_URI` in the Vercel project settings under **Settings > Environment Variables** for the environments you deploy to, then redeploy. Do not commit the URI to Git; `.env.local` is ignored for local development.
 
 For non-zero demo dashboards, run the enhanced seed against the same MongoDB database used by Vercel:
 
