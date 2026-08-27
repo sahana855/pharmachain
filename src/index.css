@@ -1,0 +1,137 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    @apply bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50;
+    min-height: 100vh;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-gray-300 rounded-full;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-gray-400;
+  }
+}
+
+@layer components {
+  /* Glass Card */
+  .glass-card {
+    @apply bg-white/70 backdrop-blur-xl border border-white/20 shadow-xl shadow-indigo-500/5 rounded-2xl;
+  }
+
+  .glass-card-solid {
+    @apply bg-white backdrop-blur-xl border border-gray-100 shadow-xl shadow-indigo-500/5 rounded-2xl;
+  }
+
+  /* Glass Navbar */
+  .glass-nav {
+    @apply bg-white/80 backdrop-blur-xl border-b border-gray-200/50 shadow-sm;
+  }
+
+  /* Gradient text */
+  .gradient-text {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary-600 to-indigo-500;
+  }
+
+  /* Gradient buttons */
+  .btn-gradient {
+    @apply bg-gradient-to-r from-primary-500 to-indigo-600 text-white hover:from-primary-600 hover:to-indigo-700 shadow-lg shadow-primary-500/25 hover:shadow-primary-500/40 transition-all duration-300;
+  }
+
+  .btn-gradient-green {
+    @apply bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700 shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 transition-all duration-300;
+  }
+
+  .btn-gradient-red {
+    @apply bg-gradient-to-r from-red-500 to-rose-600 text-white hover:from-red-600 hover:to-rose-700 shadow-lg shadow-red-500/25 hover:shadow-red-500/40 transition-all duration-300;
+  }
+
+  /* Input fields */
+  .input-modern {
+    @apply w-full px-4 py-3 bg-white/80 border border-gray-200 rounded-xl 
+           focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 
+           outline-none transition-all duration-200
+           placeholder:text-gray-400;
+  }
+
+  /* Stat Card */
+  .stat-card {
+    @apply relative overflow-hidden rounded-2xl p-6 transition-all duration-300 hover:scale-[1.02] hover:shadow-xl;
+  }
+
+  .stat-card::before {
+    content: '';
+    @apply absolute inset-0 opacity-10;
+  }
+
+  /* Animated background */
+  .animated-bg {
+    background: linear-gradient(-45deg, #eef2ff, #e0e7ff, #c7d2fe, #a5b4fc);
+    background-size: 400% 400%;
+    animation: gradient 15s ease infinite;
+  }
+
+@keyframes gradient {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+}
+
+/* Scan line animation for QR scanner */
+@keyframes scan-line {
+  0% { top: 0; opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { top: 100%; opacity: 0; }
+}
+
+.animate-scan-line {
+  animation: scan-line 2s ease-in-out infinite;
+}
+
+/* Print styles: only show the QR label when printing/saving as PDF */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .print-only,
+  .print-only * {
+    visibility: visible;
+  }
+  .print-only {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    display: block !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  @page {
+    margin: 10mm;
+  }
+}
