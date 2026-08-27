@@ -16,6 +16,13 @@ import Button from '../components/ui/Button';
 
 type Tab = 'shipments' | 'boxes';
 
+type TrackingItem = {
+  id: string;
+  status: string;
+  delayAlert: boolean;
+  source: 'shipment' | 'box';
+};
+
 type ShipmentData = Record<string, unknown> & {
   _id?: string; id?: string; shipmentNumber: string; shipmentQrId: string;
   status: string; fromName?: string; toName?: string; currentLocation?: string;
@@ -37,6 +44,7 @@ export default function LiveTracking() {
   const [activeTab, setActiveTab] = useState<Tab>('shipments');
   const [shipments, setShipments] = useState<ShipmentData[]>([]);
   const [boxes, setBoxes] = useState<BoxData[]>([]);
+  const [trackingItems, setTrackingItems] = useState<TrackingItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -52,21 +60,60 @@ export default function LiveTracking() {
         transportBoxApi.list(),
       ]);
 
-      const userShipments: ShipmentData[] = (shipData.items || []).filter((s: ShipmentData) => {
+      // Build deduplicated tracking items with source labeling
+      const allItems: TrackingItem[] = [];
+
+      // Process shipments
+      const shipments: ShipmentData[] = (shipData.items || []).filter((s: ShipmentData) => {
         const matchesFrom = s.fromId === user?.id || s.fromId?.toString() === user?.id;
         const matchesTo = s.toId === user?.id || s.toId?.toString() === user?.id;
         const matchesTransport = s.transportId === user?.id || s.transportId?.toString() === user?.id;
         return user?.role === 'admin' ? true : matchesFrom || matchesTo || matchesTransport;
       });
 
-      const userBoxes: BoxData[] = (boxData.boxes || []).filter((b: BoxData) => {
+      const boxDataItems: BoxData[] = (boxData.boxes || []).filter((b: BoxData) => {
         const matches = ['manufacturerId', 'dealerId', 'transporterId']
           .some(k => (b as Record<string, unknown>)[k] === user?.id || (b as Record<string, unknown>)[k]?.toString() === user?.id);
         return user?.role === 'admin' ? true : matches;
       });
 
-      setShipments(userShipments);
-      setBoxes(userBoxes);
+      // Add shipments with source label
+      shipments.forEach((s) => {
+        const id = s._id || s.id || s.shipmentQrId || s.shipmentNumber;
+        if (id) {
+          allItems.push({
+            id,
+            status: s.status,
+            delayAlert: !!s.delayAlert,
+            source: 'shipment',
+          });
+        }
+      });
+
+      // Add boxes with source label
+      boxDataItems.forEach((b) => {
+        const id = b._id || b.boxId;
+        if (id) {
+          allItems.push({
+            id,
+            status: b.status,
+            delayAlert: !!b.delayAlert,
+            source: 'box',
+          });
+        }
+      });
+
+      // Deduplicate by ID (keep first occurrence)
+      const seen = new Set<string>();
+      const dedupedItems = allItems.filter((item) => {
+        if (seen.has(item.id)) return false;
+        seen.add(item.id);
+        return true;
+      });
+
+      setShipments(shipments);
+      setBoxes(boxDataItems);
+      setTrackingItems(dedupedItems);
     } catch (e: unknown) {
       console.error('Failed to load tracking data:', e);
     } finally {
@@ -90,6 +137,9 @@ export default function LiveTracking() {
   );
   const activeBoxes = boxes.filter(b =>
     !['DELIVERED', 'CANCELLED'].includes(b.status)
+  );
+  const activeTrackingItems = trackingItems.filter(item =>
+    !['DELIVERED', 'CANCELLED'].includes(item.status)
   );
 
   const getStatusBadge = (status: string) => {
@@ -183,7 +233,7 @@ export default function LiveTracking() {
             <div>
               <p className="text-sm text-gray-500">Delayed</p>
               <p className="text-2xl font-bold text-gray-900">
-                {[...activeShipments, ...activeBoxes].filter(item => item.delayAlert || item.status === 'DELAYED').length}
+                {trackingItems.filter(item => item.delayAlert || item.status === 'DELAYED').length}
               </p>
             </div>
           </div>
