@@ -561,7 +561,7 @@ router.post('/:boxId/location', authenticate, authorize('transport'), requireVer
 
       res.json({
        success: true,
-       message: demoFlag ? 'Box location updated (Demo Tracking Data)' : 'Box location updated',
+       message: 'Box location updated',
        event,
        box: { currentLocation: box.currentLocation, locationUpdatedAt: box.locationUpdatedAt },
        chain,

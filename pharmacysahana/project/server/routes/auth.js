@@ -295,6 +295,9 @@ router.post('/users/approve-all', authenticate, authorize('admin'), async (req, 
       { role: { $ne: 'admin' }, verificationStatus: 'pending' },
       { $set: { verificationStatus: 'verified' } },
     );
+    await emitEvent('user_approved_all', {
+      approvedCount: result.modifiedCount,
+    });
     res.json({ success: true, approved: result.modifiedCount });
   } catch (err) {
     next(err);
@@ -308,6 +311,11 @@ router.post('/users/:id/approve', authenticate, authorize('admin'), async (req, 
     if (!user) return res.status(404).json({ success: false, error: 'User not found' });
     user.verificationStatus = 'verified';
     await user.save();
+    await emitEvent('user_approved', {
+      userId: String(user._id),
+      userName: user.name,
+      role: user.role,
+    });
     res.json({ success: true, message: `${user.name} approved`, user });
   } catch (err) {
     next(err);
@@ -321,6 +329,11 @@ router.post('/users/:id/reject', authenticate, authorize('admin'), async (req, r
     if (!user) return res.status(404).json({ success: false, error: 'User not found' });
     user.verificationStatus = 'rejected';
     await user.save();
+    await emitEvent('user_rejected', {
+      userId: String(user._id),
+      userName: user.name,
+      role: user.role,
+    });
     res.json({ success: true, message: `${user.name} rejected`, user });
   } catch (err) {
     next(err);

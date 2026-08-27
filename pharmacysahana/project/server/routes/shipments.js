@@ -402,6 +402,12 @@ router.post('/:id/accept', authenticate, authorize('dealer', 'pharmacy'), requir
     shipment.status = req.user.role === 'dealer' ? 'DEALER_ACCEPTED' : 'DELIVERED_TO_PHARMACY';
     await shipment.save();
     await addTrackingEvent(shipment, shipment.status, `Shipment accepted by ${req.user.name}`, { updatedById: req.user.id, updatedByName: req.user.name, updatedByRole: req.user.role });
+    await emitEvent('shipment_updated', {
+      shipmentId: String(shipment._id),
+      shipmentQrId: shipment.shipmentQrId,
+      status: shipment.status,
+      targetRole: req.user.role,
+    });
     const chain = await recordTransaction(req.user.role === 'dealer' ? 'DEALER_ACCEPTED' : 'PHARMACY_RECEIVED', { shipmentId: String(shipment._id), shipmentQrId: shipment.shipmentQrId, userId: req.user.id, payload: { status: shipment.status } });
     res.json({ success: true, shipment, chain });
   } catch (err) {

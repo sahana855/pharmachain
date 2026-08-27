@@ -37,7 +37,7 @@ export default function LocationUpdate() {
         note: 'Transporter location update',
         isDemo: false,
       });
-      setSuccess(`Location updated to "${location}" (Demo Tracking Data)`);
+      setSuccess(`Location updated to "${location}"`);
       // Refresh
       const data = await shipmentApi.list();
       setDeliveries((data.items || []).filter((d: any) => d.status !== 'DELIVERED'));

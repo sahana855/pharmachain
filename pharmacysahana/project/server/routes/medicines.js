@@ -213,6 +213,14 @@ router.patch('/:id/status', authenticate, authorize('manufacturer', 'admin'), re
       });
     }
 
+    await emitEvent('medicine_status_updated', {
+      medicineId: String(medicine._id),
+      medicineQrId: medicine.qrCodeId,
+      status,
+      updatedBy: req.user.name,
+      updatedByRole: req.user.role,
+    });
+
     res.json({ success: true, message: `Medicine marked ${status}`, medicine: medicine.toPublicJSON() });
   } catch (err) {
     next(err);

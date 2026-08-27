@@ -14,7 +14,10 @@ export type LiveEventType =
   | 'box_created'
   | 'box_updated'
   | 'box_scanned'
-  | 'connected';
+  | 'connected'
+  | 'user_approved'
+  | 'user_rejected'
+  | 'user_approved_all';
 
 const EVENT_TYPES: LiveEventType[] = [
   'shipment_created',
@@ -23,6 +26,9 @@ const EVENT_TYPES: LiveEventType[] = [
   'box_updated',
   'box_scanned',
   'connected',
+  'user_approved',
+  'user_rejected',
+  'user_approved_all',
 ];
 
 const RECONNECT_DELAY = 5000;

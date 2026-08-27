@@ -1,5 +1,4 @@
 // PharmaChain tracking routes - transport location updates + shipment timeline
-// Demo location data is clearly labelled "Demo Tracking Data".
 import express from 'express';
 import Shipment from '../models/Shipment.js';
 import TrackingEvent from '../models/TrackingEvent.js';
@@ -7,6 +6,7 @@ import { authenticate } from '../middleware/auth.js';
 import { authorize, requireVerified } from '../middleware/role.js';
 import { isShipmentQr } from '../services/qrService.js';
 import { recordTransaction } from '../services/blockchainService.js';
+import { emitEvent } from '../services/eventBus.js';
 
 const router = express.Router();
 
@@ -62,9 +62,19 @@ router.post('/:shipmentId/location', authenticate, authorize('transport'), requi
       payload: { type: 'LOCATION_UPDATE', location, isDemo: demoFlag },
     });
 
+    emitEvent('shipment_updated', {
+      shipmentId: String(shipment._id),
+      shipmentQrId: shipment.shipmentQrId,
+      status: shipment.status,
+      location,
+      currentLocation: shipment.currentLocation,
+      updatedBy: req.user.name,
+      updatedByRole: req.user.role,
+    });
+
     res.json({
       success: true,
-      message: demoFlag ? 'Location updated (Demo Tracking Data)' : 'Location updated',
+      message: 'Location updated',
       event,
       shipment: {
         currentLocation: shipment.currentLocation,
@@ -104,6 +114,14 @@ router.post('/:shipmentId/proof', authenticate, authorize('transport'), requireV
       shipmentQrId: shipment.shipmentQrId,
       userId: req.user.id,
       payload: { type: 'PROOF_UPLOADED', proofType: proofType || 'photo' },
+    });
+
+    await emitEvent('shipment_updated', {
+      shipmentId: String(shipment._id),
+      shipmentQrId: shipment.shipmentQrId,
+      status: shipment.status,
+      proofUploaded: true,
+      proofType: proofType || 'photo',
     });
 
     res.json({ success: true, message: 'Delivery proof uploaded', event });

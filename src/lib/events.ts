@@ -200,7 +200,7 @@ export function useLiveSync(callback: () => void): UseLiveSyncResult {
       clearInterval(checkTimer);
       unsubs.forEach((u) => u());
     };
-  }, []);
+  }, [callback]);
 
   return { connected, lastEvent };
 }
