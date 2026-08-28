@@ -1,6 +1,7 @@
 import { Component, ErrorInfo, ReactNode, StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
+import 'leaflet/dist/leaflet.css';
 import './index.css';
 
 class AppErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {

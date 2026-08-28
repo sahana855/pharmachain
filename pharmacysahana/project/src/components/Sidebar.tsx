@@ -18,7 +18,6 @@ export type RoleNavItem = {
 export const roleNavItems: Record<string, RoleNavItem[]> = {
   manufacturer: [
     { label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard/manufacturer' },
-    { label: 'Live Tracking', icon: Navigation, path: '/scan' },
     { label: 'Track Box', icon: Boxes, path: '/shipment-scan' },
     { label: 'Data Entry', icon: Package, path: '/manufacturer/data-entry' },
     { label: 'Stock Maintenance', icon: ClipboardList, path: '/manufacturer/stock' },
@@ -32,7 +31,6 @@ export const roleNavItems: Record<string, RoleNavItem[]> = {
   ],
   dealer: [
     { label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard/dealer' },
-    { label: 'Live Tracking', icon: Navigation, path: '/scan' },
     { label: 'Track Box', icon: Boxes, path: '/shipment-scan' },
     { label: 'Stock', icon: Package, path: '/dealer/stock' },
     { label: 'Dispatch', icon: Truck, path: '/dealer/dispatch' },
@@ -44,7 +42,6 @@ export const roleNavItems: Record<string, RoleNavItem[]> = {
   ],
   transport: [
     { label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard/transport' },
-    { label: 'Live Tracking', icon: Navigation, path: '/scan' },
     { label: 'Scan Box', icon: Boxes, path: '/shipment-scan' },
     { label: 'Location Update', icon: MapPin, path: '/transport/location' },
     { label: 'Delivery Status', icon: Clock, path: '/transport/delivery-status' },
@@ -53,7 +50,6 @@ export const roleNavItems: Record<string, RoleNavItem[]> = {
   ],
   pharmacy: [
     { label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard/pharmacy' },
-    { label: 'Live Tracking', icon: Navigation, path: '/scan' },
     { label: 'Receive Shipment', icon: Package, path: '/pharmacy/receive-shipment' },
     { label: 'Scan Box', icon: Boxes, path: '/shipment-scan' },
     { label: 'QR Checking', icon: ScanLine, path: '/pharmacy/qr-checking' },
@@ -70,7 +66,6 @@ export const roleNavItems: Record<string, RoleNavItem[]> = {
   ],
   patient: [
     { label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard/patient' },
-    { label: 'Live Tracking', icon: Navigation, path: '/scan' },
     { label: 'Drug Alert', icon: AlertTriangle, path: '/patient/drug-alert' },
     { label: 'Expiry Alert', icon: Thermometer, path: '/patient/expiry-alert' },
     { label: 'Transport Data', icon: Truck, path: '/patient/transport' },

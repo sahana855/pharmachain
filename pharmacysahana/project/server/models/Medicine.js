@@ -43,9 +43,9 @@ medicineSchema.virtual('isExpired').get(function () {
 
 medicineSchema.methods.toPublicJSON = function () {
   const obj = this.toJSON();
-  delete obj.manufacturerId; // keep internal ref private when needed
   return {
     ...obj,
+    manufacturerId: this.manufacturerId,
     verificationUrl: `/verify/${this.qrCodeId}`,
   };
 };

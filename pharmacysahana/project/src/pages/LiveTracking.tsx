@@ -1,7 +1,8 @@
 // PharmaChain Live Tracking Dashboard
 // Shows real-time status of all shipments and transport boxes.
 // Uses SSE (Server-Sent Events) for instant updates without page refresh.
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import L from 'leaflet';
 import { useAuth } from '../lib/auth';
 import { useNavigate } from 'react-router-dom';
 import { shipmentApi, transportBoxApi } from '../lib/api';
@@ -28,8 +29,71 @@ type BoxData = Record<string, unknown> & {
   currentLocation?: string; transporterName?: string; vehicleNumber?: string;
   medicineNames?: string[]; quantity?: number; delayAlert?: boolean;
   deliveredAt?: string; expectedDeliveryDate?: string; isDemo?: boolean;
-  locationUpdatedAt?: string;
+  locationUpdatedAt?: string; latitude?: number; longitude?: number;
 };
+
+const escapePopupText = (value: unknown) => String(value || '').replace(/[&<>"']/g, (character) => ({
+  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+}[character] || character));
+
+function TrackingMap({ boxes }: { boxes: BoxData[] }) {
+  const mapElement = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<L.Map | null>(null);
+  const markersRef = useRef<L.LayerGroup | null>(null);
+  const mappedBoxes = boxes.filter((box) => Number.isFinite(box.latitude) && Number.isFinite(box.longitude));
+
+  useEffect(() => {
+    if (!mapElement.current || mapRef.current) return;
+    const map = L.map(mapElement.current).setView([20.5937, 78.9629], 5);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors', maxZoom: 19,
+    }).addTo(map);
+    markersRef.current = L.layerGroup().addTo(map);
+    mapRef.current = map;
+    setTimeout(() => map.invalidateSize(), 200);
+    return () => { map.remove(); mapRef.current = null; markersRef.current = null; };
+  }, []);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    const markers = markersRef.current;
+    if (!map || !markers) return;
+    markers.clearLayers();
+    const points: L.LatLngExpression[] = [];
+    mappedBoxes.forEach((box) => {
+      const point: L.LatLngExpression = [box.latitude as number, box.longitude as number];
+      points.push(point);
+      const color = box.status === 'DELAYED' ? '#dc2626' : box.status === 'DELIVERED' ? '#059669' : '#4f46e5';
+      const icon = L.divIcon({
+        className: 'tracking-map-marker', html: `<span style="background:${color}"></span>`,
+        iconSize: [18, 18], iconAnchor: [9, 9],
+      });
+      L.marker(point, { icon })
+        .bindPopup(`<strong>${escapePopupText(box.boxId)}</strong><br>${escapePopupText(box.status.replace(/_/g, ' '))}<br>${escapePopupText(box.currentLocation || 'Location not set')}`)
+        .addTo(markers);
+    });
+    if (points.length === 1) map.setView(points[0], 12);
+    if (points.length > 1) map.fitBounds(L.latLngBounds(points), { padding: [30, 30] });
+  }, [mappedBoxes]);
+
+  return (
+    <Card title="Live shipment map" subtitle="GPS locations reported by transport boxes" icon={<MapPin />}>
+      <div className="relative h-[360px] overflow-hidden rounded-xl border border-gray-200">
+        <div ref={mapElement} className="h-full w-full" />
+        {mappedBoxes.length === 0 && (
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-white/80 p-6 text-center">
+            <div><MapPin size={32} className="mx-auto mb-2 text-gray-300" /><p className="text-sm font-medium text-gray-600">No GPS locations reported yet</p><p className="mt-1 text-xs text-gray-400">The map will update when a transporter sends coordinates.</p></div>
+          </div>
+        )}
+      </div>
+      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
+        <span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-indigo-600" />In transit</span>
+        <span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-emerald-600" />Delivered</span>
+        <span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-red-600" />Delayed</span>
+      </div>
+    </Card>
+  );
+}
 
 export default function LiveTracking() {
   const { user } = useAuth();
@@ -189,6 +253,8 @@ export default function LiveTracking() {
           </div>
         </Card>
       </div>
+
+      <TrackingMap boxes={boxes} />
 
       {/* Tab selector */}
       <div className="flex gap-2 border-b border-gray-200">
