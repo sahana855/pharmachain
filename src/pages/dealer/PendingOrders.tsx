@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../lib/auth';
-import { getDB } from '../../lib/db';
+import { shipmentApi } from '../../lib/api';
 import { ShoppingCart, CheckCircle, XCircle } from 'lucide-react';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
@@ -12,23 +12,30 @@ export default function PendingOrders() {
   const [loading, setLoading] = useState(true);
 
   const fetchOrders = async () => {
-    const db = await getDB();
-    const all = await db.getAll('orders');
-    const pending = all.filter(o => (o.toId === user?.id || o.fromId === user?.id) && o.status === 'pending');
-    setOrders(pending);
-    setLoading(false);
+    try {
+      const res = await shipmentApi.list();
+      const shipments = res.items || [];
+      const pending = shipments.filter((o: any) => o.toId === user?.id && (o.status === 'ASSIGNED_TO_DEALER' || o.status === 'DELIVERED_TO_DEALER'));
+      setOrders(pending);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { fetchOrders(); }, [user]);
 
   const handleAction = async (orderId: string, action: 'approved' | 'cancelled') => {
-    const db = await getDB();
-    const order = await db.get('orders', orderId);
-    if (order) {
-      order.status = action;
-      order.updatedAt = new Date().toISOString();
-      await db.put('orders', order);
+    try {
+      if (action === 'approved') {
+        await shipmentApi.acceptDelivery(orderId);
+      }
+      // TODO: implement cancel if needed via status patch
       fetchOrders();
+    } catch (e) {
+      console.error(e);
+      alert('Action failed');
     }
   };
 
@@ -53,13 +60,13 @@ export default function PendingOrders() {
         ) : (
           <div className="space-y-4">
             {orders.map(order => (
-              <div key={order.id} className="p-4 border border-gray-200 rounded-lg">
+              <div key={order._id || order.id} className="p-4 border border-gray-200 rounded-lg">
                 <div className="flex justify-between items-start mb-3">
                   <div>
-                    <h3 className="font-semibold text-gray-900">{order.orderNumber}</h3>
+                    <h3 className="font-semibold text-gray-900">{order.shipmentNumber || order.orderNumber}</h3>
                     <p className="text-sm text-gray-500">From: {order.fromName} ({order.fromRole})</p>
                   </div>
-                  <Badge variant="warning">Pending</Badge>
+                  <Badge variant="warning">{order.status}</Badge>
                 </div>
                 <div className="space-y-2 mb-3">
                   {order.items.map((item: any, idx: number) => (
@@ -74,10 +81,10 @@ export default function PendingOrders() {
                   </div>
                 </div>
                 <div className="flex gap-3">
-                  <Button size="sm" variant="success" onClick={() => handleAction(order.id, 'approved')}>
-                    <CheckCircle size={14} /> Approve
+                  <Button size="sm" variant="success" onClick={() => handleAction(order._id || order.id, 'approved')}>
+                    <CheckCircle size={14} /> Accept Shipment
                   </Button>
-                  <Button size="sm" variant="danger" onClick={() => handleAction(order.id, 'cancelled')}>
+                  <Button size="sm" variant="danger" onClick={() => handleAction(order._id || order.id, 'cancelled')}>
                     <XCircle size={14} /> Reject
                   </Button>
                 </div>

@@ -8,7 +8,7 @@ interface UseDashboardOptions {
   enabled?: boolean;
 }
 
-export function useShipments(pollInterval = 10000, enabled = true) {
+export function useShipments(pollInterval = 30000, enabled = true) {
   const [shipments, setShipments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -35,7 +35,7 @@ export function useShipments(pollInterval = 10000, enabled = true) {
   return { shipments, loading, refresh: fetchShipments };
 }
 
-export function useTransportBoxes(pollInterval = 10000, enabled = true) {
+export function useTransportBoxes(pollInterval = 30000, enabled = true) {
   const [boxes, setBoxes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -62,7 +62,7 @@ export function useTransportBoxes(pollInterval = 10000, enabled = true) {
   return { boxes, loading, refresh: fetchBoxes };
 }
 
-export function useMedicines(pollInterval = 10000, enabled = true) {
+export function useMedicines(pollInterval = 30000, enabled = true) {
   const [medicines, setMedicines] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 

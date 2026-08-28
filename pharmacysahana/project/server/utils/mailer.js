@@ -2,6 +2,24 @@
 import nodemailer from 'nodemailer';
 import { env } from '../config/env.js';
 
+const EMAIL_RATE_LIMIT = parseInt(process.env.EMAIL_RATE_LIMIT_PER_HOUR || '100', 10);
+const emailTimestamps: number[] = [];
+
+function checkEmailRateLimit() {
+  const now = Date.now();
+  const oneHourAgo = now - 60 * 60 * 1000;
+  while (emailTimestamps.length > 0 && emailTimestamps[0] < oneHourAgo) {
+    emailTimestamps.shift();
+  }
+  if (emailTimestamps.length >= EMAIL_RATE_LIMIT) {
+    const retryAfter = Math.ceil((emailTimestamps[0] + 60 * 60 * 1000 - now) / 1000 / 60);
+    const err = new Error(`Email rate limit reached (${EMAIL_RATE_LIMIT}/hour). Retry after ${retryAfter} minutes.`);
+    (err as any).code = 'EMAIL_RATE_LIMITED';
+    throw err;
+  }
+  emailTimestamps.push(now);
+}
+
 // Do NOT cache the transporter globally — a stale/failed connection would permanently
 // block all future login attempts. Create a fresh transporter on every send instead.
 
@@ -141,6 +159,8 @@ export function buildOtpEmail(otp, { resend = false } = {}) {
 
 export default async function sendMail({ to, subject, text, html }) {
   if (!to) throw new Error('sendMail: "to" address is required');
+
+  checkEmailRateLimit();
 
   const { transporter: mailer, from, initError: setupError } = ensureTransporter();
   if (!mailer) {

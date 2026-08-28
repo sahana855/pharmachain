@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../lib/auth';
-import { getDB } from '../../lib/db';
+import { stockApi } from '../../lib/api';
 import { Bell, AlertTriangle, Package } from 'lucide-react';
 import Card from '../../components/ui/Card';
 import Badge from '../../components/ui/Badge';
@@ -12,11 +12,14 @@ export default function LowStockAlertPharmacy() {
 
   useEffect(() => {
     const fetchData = async () => {
-      const db = await getDB();
-      const all = await db.getAll('stock');
-      const myStock = all.filter(s => s.ownerId === user?.id);
-      setLowStock(myStock.filter(s => s.quantity < 50));
-      setLoading(false);
+      try {
+        const res = await stockApi.getLowStock(50);
+        setLowStock(res.items || []);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
     };
     fetchData();
   }, [user]);
@@ -40,7 +43,7 @@ export default function LowStockAlertPharmacy() {
               <thead><tr className="bg-gray-50 border-b"><th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Medicine</th><th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Batch</th><th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Stock</th><th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Status</th></tr></thead>
               <tbody className="divide-y divide-gray-100">
                 {lowStock.map(s => (
-                  <tr key={s.id} className="hover:bg-gray-50">
+                  <tr key={s._id || s.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 text-sm font-medium">{s.medicineName}</td>
                     <td className="px-4 py-3 text-sm font-mono">{s.batchNumber}</td>
                     <td className="px-4 py-3"><span className={`text-sm font-bold ${s.quantity < 20 ? 'text-red-600' : 'text-orange-600'}`}>{s.quantity}</span></td>

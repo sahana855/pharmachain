@@ -5,6 +5,7 @@ import Shipment from '../models/Shipment.js';
 import Medicine from '../models/Medicine.js';
 import TrackingEvent from '../models/TrackingEvent.js';
 import User from '../models/User.js';
+import Stock from '../models/Stock.js';
 import { authenticate } from '../middleware/auth.js';
 import { authorize } from '../middleware/role.js';
 import { generateShipmentQrToken, generateQrDataUrl, isShipmentQr } from '../services/qrService.js';
@@ -142,6 +143,15 @@ router.post('/', authenticate, authorize('manufacturer', 'dealer'), async (req, 
       expectedDelivery,
       status: req.user.role === 'manufacturer' ? 'ASSIGNED_TO_DEALER' : 'ASSIGNED_TO_PHARMACY',
     });
+
+    if (req.user.role === 'dealer') {
+      for (const item of items) {
+        await Stock.updateOne(
+          { ownerId: req.user.id, medicineId: item.medicineId },
+          { $inc: { quantity: -item.quantity } }
+        );
+      }
+    }
 
     await addTrackingEvent(shipment, 'CREATED', `Shipment created by ${req.user.name}`, {
       updatedById: req.user.id,
@@ -375,6 +385,30 @@ router.post('/:id/accept', authenticate, authorize('dealer', 'pharmacy'), async 
     if (!expected.includes(shipment.status)) return res.status(409).json({ success: false, error: `Shipment cannot be accepted from ${shipment.status}` });
     shipment.status = req.user.role === 'dealer' ? 'DEALER_ACCEPTED' : 'DELIVERED_TO_PHARMACY';
     await shipment.save();
+
+    // Add to stock
+    for (const item of shipment.items) {
+      const existingStock = await Stock.findOne({ ownerId: req.user.id, medicineId: item.medicineId });
+      if (existingStock) {
+        existingStock.quantity += item.quantity;
+        await existingStock.save();
+      } else {
+        const medicine = await Medicine.findById(item.medicineId);
+        if (medicine) {
+          await Stock.create({
+            medicineId: item.medicineId,
+            medicineName: item.medicineName,
+            batchNumber: item.batchNumber || medicine.batchNumber,
+            ownerId: req.user.id,
+            ownerRole: req.user.role,
+            quantity: item.quantity,
+            price: item.price || medicine.price,
+            expiryDate: medicine.expiryDate,
+          });
+        }
+      }
+    }
+
     await addTrackingEvent(shipment, shipment.status, `Shipment accepted by ${req.user.name}`, { updatedById: req.user.id, updatedByName: req.user.name, updatedByRole: req.user.role });
     const chain = await recordTransaction(req.user.role === 'dealer' ? 'DEALER_ACCEPTED' : 'PHARMACY_RECEIVED', { shipmentId: String(shipment._id), shipmentQrId: shipment.shipmentQrId, userId: req.user.id, payload: { status: shipment.status } });
     res.json({ success: true, shipment, chain });

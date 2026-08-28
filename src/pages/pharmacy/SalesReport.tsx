@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../lib/auth';
-import { getDB } from '../../lib/db';
+import { shipmentApi } from '../../lib/api';
 import { BarChart3, Download, DollarSign, TrendingUp } from 'lucide-react';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
@@ -14,17 +14,26 @@ export default function SalesReport() {
 
   useEffect(() => {
     const fetchData = async () => {
-      const db = await getDB();
-      const all = await db.getAll('sales');
-      setSales(all.filter(s => s.pharmacyId === user?.id));
-      setLoading(false);
+      try {
+        const res = await shipmentApi.list();
+        // Treat delivered shipments destined for this pharmacy as "sales"
+        const delivered = (res.items || []).filter((s: any) =>
+          (s.toId === user?.id || s.toId?._id === user?.id) &&
+          (s.status === 'DELIVERED_TO_PHARMACY' || s.status === 'DELIVERED')
+        );
+        setSales(delivered);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
     };
     fetchData();
   }, [user]);
 
   const generateCSV = () => {
-    const headers = ['Medicine', 'Quantity', 'Unit Price', 'Total', 'Date'];
-    const rows = sales.map(s => [s.medicineName, s.quantity, s.price, s.totalAmount, new Date(s.createdAt).toLocaleDateString()]);
+    const headers = ['Shipment #', 'From', 'Total Amount', 'Date'];
+    const rows = sales.map((s: any) => [s.shipmentNumber, s.fromName, s.totalAmount, new Date(s.createdAt).toLocaleDateString()]);
     const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
@@ -37,12 +46,12 @@ export default function SalesReport() {
 
   const getChartData = () => {
     const grouped: Record<string, { total: number; count: number }> = {};
-    sales.forEach(s => {
+    sales.forEach((s: any) => {
       const date = new Date(s.createdAt);
       const key = period === 'daily' ? date.toLocaleDateString() : `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
       if (!grouped[key]) grouped[key] = { total: 0, count: 0 };
-      grouped[key].total += s.totalAmount;
-      grouped[key].count += s.quantity;
+      grouped[key].total += s.totalAmount || 0;
+      grouped[key].count += (s.items || []).reduce((a: number, i: any) => a + i.quantity, 0);
     });
     return Object.entries(grouped).map(([date, data]) => ({
       date,
@@ -51,8 +60,8 @@ export default function SalesReport() {
     }));
   };
 
-  const totalRevenue = sales.reduce((s, i) => s + i.totalAmount, 0);
-  const totalItems = sales.reduce((s, i) => s + i.quantity, 0);
+  const totalRevenue = sales.reduce((s: number, i: any) => s + (i.totalAmount || 0), 0);
+  const totalItems = sales.reduce((s: number, i: any) => s + (i.items || []).reduce((a: number, x: any) => a + x.quantity, 0), 0);
 
   if (loading) return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" /></div>;
 

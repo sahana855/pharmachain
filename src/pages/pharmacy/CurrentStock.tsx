@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../lib/auth';
-import { getDB } from '../../lib/db';
+import { stockApi } from '../../lib/api';
 import { Package, DollarSign } from 'lucide-react';
 import Card from '../../components/ui/Card';
 import Badge from '../../components/ui/Badge';
@@ -12,10 +12,14 @@ export default function CurrentStock() {
 
   useEffect(() => {
     const fetchData = async () => {
-      const db = await getDB();
-      const all = await db.getAll('stock');
-      setStock(all.filter(s => s.ownerId === user?.id));
-      setLoading(false);
+      try {
+        const res = await stockApi.list();
+        setStock(res.items || []);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
     };
     fetchData();
   }, [user]);
@@ -46,7 +50,7 @@ export default function CurrentStock() {
                 const isExpiring = new Date(s.expiryDate) <= new Date(Date.now() + 90 * 24 * 60 * 60 * 1000) && !isExpired;
                 const isLow = s.quantity < 50;
                 return (
-                  <tr key={s.id} className="hover:bg-gray-50">
+                  <tr key={s._id || s.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 text-sm font-medium">{s.medicineName}</td>
                     <td className="px-4 py-3 text-sm font-mono text-gray-600">{s.batchNumber}</td>
                     <td className="px-4 py-3 text-sm font-medium">{s.quantity}</td>

@@ -29,10 +29,13 @@ interface RequestOptions {
   method?: string;
   body?: any;
   auth?: boolean;
+  retries?: number;
 }
 
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 async function request<T = any>(path: string, opts: RequestOptions = {}): Promise<T> {
-  const { method = 'GET', body, auth = true } = opts;
+  const { method = 'GET', body, auth = true, retries = 3 } = opts;
   const headers: Record<string, string> = {};
 
   if (body !== undefined) {
@@ -46,43 +49,60 @@ async function request<T = any>(path: string, opts: RequestOptions = {}): Promis
     }
   }
 
-  let res: Response;
-  try {
-    res = await fetch(apiUrl(path), {
-      method,
-      headers,
-      body: body !== undefined ? JSON.stringify(body) : undefined,
-    });
-  } catch (err: any) {
-    const message =
-      err?.message?.includes('Failed to fetch') || err?.message?.includes('NetworkError')
-        ? 'Unable to reach the PharmaChain backend. Please make sure the backend server is running and reachable.'
-        : err?.message || 'Network request failed.';
-    throw new ApiError(message, 0);
-  }
+  let lastError: ApiError | null = null;
 
-  let data: any = null;
-  let responseText = '';
-  try {
-    responseText = await res.text();
-    data = responseText ? JSON.parse(responseText) : null;
-  } catch {
-    // Keep the raw response so deployment errors are actionable.
-  }
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    if (attempt > 0) {
+      const backoff = Math.min(1000 * Math.pow(2, attempt - 1), 8000) + Math.random() * 500;
+      await sleep(backoff);
+    }
 
-  if (!res.ok) {
+    let res: Response;
+    try {
+      res = await fetch(apiUrl(path), {
+        method,
+        headers,
+        body: body !== undefined ? JSON.stringify(body) : undefined,
+      });
+    } catch (err: any) {
+      const message =
+        err?.message?.includes('Failed to fetch') || err?.message?.includes('NetworkError')
+          ? 'Unable to reach the PharmaChain backend. Please make sure the backend server is running and reachable.'
+          : err?.message || 'Network request failed.';
+      lastError = new ApiError(message, 0);
+      if (attempt < retries) continue;
+      throw lastError;
+    }
+
+    let data: any = null;
+    let responseText = '';
+    try {
+      responseText = await res.text();
+      data = responseText ? JSON.parse(responseText) : null;
+    } catch {
+      // Keep the raw response so deployment errors are actionable.
+    }
+
+    if (res.ok) {
+      if (data === null) {
+        throw new ApiError('The server returned an invalid non-JSON response. Check the deployment API configuration.', res.status);
+      }
+      return data as T;
+    }
+
     const htmlResponse = responseText.trim().startsWith('<') || responseText.startsWith('The page');
     const message = data?.error || data?.message || (htmlResponse
       ? `The API endpoint is not available on this deployment (${res.status}). Check the Vercel serverless API configuration.`
       : `Request failed (${res.status})`);
-    throw new ApiError(message, res.status);
+    lastError = new ApiError(message, res.status);
+
+    if (attempt < retries && (res.status >= 500 || res.status === 429 || res.status === 0)) {
+      continue;
+    }
+    throw lastError;
   }
 
-  if (data === null) {
-    throw new ApiError('The server returned an invalid non-JSON response. Check the deployment API configuration.', res.status);
-  }
-
-  return data as T;
+  throw lastError;
 }
 
 // ---------- Auth ----------

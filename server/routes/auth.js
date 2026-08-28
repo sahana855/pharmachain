@@ -277,6 +277,24 @@ router.get('/dealers', authenticate, async (req, res, next) => {
   }
 });
 
+// Protected: GET /api/auth/users/by-role?role=pharmacy
+// Used by dealers to list pharmacies, and others. Admin can list all.
+router.get('/users/by-role', authenticate, async (req, res, next) => {
+  try {
+    const { role } = req.query;
+    const allowedRoles = ['manufacturer', 'dealer', 'transport', 'pharmacy', 'patient'];
+    if (!role || !allowedRoles.includes(role)) {
+      return res.status(400).json({ success: false, error: 'Valid role parameter required' });
+    }
+    const users = await User.find({ role, verificationStatus: 'verified' })
+      .select('_id name email role location phone')
+      .sort({ name: 1 });
+    res.json({ success: true, users });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // Protected (admin): POST /api/auth/users/approve-all
 router.post('/users/approve-all', authenticate, authorize('admin'), async (req, res, next) => {
   try {

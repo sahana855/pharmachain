@@ -1,6 +1,7 @@
 // PharmaChain backend environment configuration
 // Loads .env.local (git-ignored) - never commit real secrets
 import 'dotenv/config';
+import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -41,7 +42,9 @@ export const env = {
   PORT: parseInt(process.env.PORT || '41837', 10),
   NODE_ENV: process.env.NODE_ENV || 'development',
   PHARMACHAIN_MONGODB_URI: process.env.PHARMACHAIN_MONGODB_URI || '',
-  JWT_SECRET: process.env.JWT_SECRET || 'pharmachain-dev-secret-change-me',
+  JWT_SECRET: envStr('JWT_SECRET') || (process.env.NODE_ENV === 'production'
+    ? (() => { throw new Error('JWT_SECRET environment variable is required in production') })()
+    : crypto.randomUUID()),
   JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || '7d',
   BLOCKCHAIN_RPC_URL: process.env.BLOCKCHAIN_RPC_URL || 'http://127.0.0.1:8545',
   BLOCKCHAIN_CONTRACT_ADDRESS: process.env.BLOCKCHAIN_CONTRACT_ADDRESS || '',

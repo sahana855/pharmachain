@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../lib/auth';
-import { getDB } from '../../lib/db';
+import { medicineApi } from '../../lib/api';
 import { AlertTriangle, AlertCircle } from 'lucide-react';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
@@ -9,45 +9,38 @@ import Modal from '../../components/ui/Modal';
 
 export default function ProductRecall() {
   const { user } = useAuth();
-  const [batches, setBatches] = useState<any[]>([]);
+  const [medicines, setMedicines] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [confirmRecall, setConfirmRecall] = useState<any>(null);
   const [success, setSuccess] = useState('');
+  const [recalling, setRecalling] = useState(false);
 
-  const fetchBatches = async () => {
-    const db = await getDB();
-    const all = await db.getAll('batches');
-    setBatches(all.filter(b => b.manufacturerId === user?.id));
-    setLoading(false);
+  const fetchMedicines = async () => {
+    try {
+      const res = await medicineApi.list({ status: 'active' });
+      setMedicines(res.items || []);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  useEffect(() => { fetchBatches(); }, [user]);
+  useEffect(() => { fetchMedicines(); }, [user]);
 
   const handleRecall = async () => {
     if (!confirmRecall) return;
-    const db = await getDB();
-    const batch = await db.get('batches', confirmRecall.id);
-    if (batch) {
-      batch.status = 'recalled' as const;
-      await db.put('batches', batch);
-
-      // Create alert for all users
-      const allUsers = await db.getAll('users');
-      for (const u of allUsers) {
-        await db.add('alerts', {
-          id: Date.now().toString(36) + Math.random().toString(36).substr(2, 9),
-          userId: u.id,
-          type: 'recall' as const,
-          title: 'Product Recall',
-          message: `Batch ${batch.batchNumber} of ${batch.medicineName} has been recalled by manufacturer.`,
-          read: false,
-          createdAt: new Date().toISOString(),
-        });
-      }
+    setRecalling(true);
+    try {
+      await medicineApi.updateStatus(confirmRecall._id || confirmRecall.id, 'recalled');
+      setSuccess(`${confirmRecall.name} (Batch: ${confirmRecall.batchNumber}) has been recalled successfully`);
+      setConfirmRecall(null);
+      fetchMedicines();
+    } catch (e: any) {
+      alert(e.message || 'Recall failed');
+    } finally {
+      setRecalling(false);
     }
-    setSuccess(`Batch ${confirmRecall.batchNumber} has been recalled successfully`);
-    setConfirmRecall(null);
-    fetchBatches();
   };
 
   if (loading) {
@@ -65,7 +58,7 @@ export default function ProductRecall() {
         <div className="p-4 bg-green-50 border border-green-200 text-green-700 rounded-lg text-sm">{success}</div>
       )}
 
-      <Card title="Active Batches" subtitle="Click on a batch to recall it" icon={<AlertTriangle />}>
+      <Card title="Active Medicines" subtitle="Click on a medicine to recall it" icon={<AlertTriangle />}>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
@@ -79,28 +72,25 @@ export default function ProductRecall() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {batches.map(batch => (
-                <tr key={batch.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 text-sm font-mono font-medium">{batch.batchNumber}</td>
-                  <td className="px-4 py-3 text-sm text-gray-700">{batch.medicineName}</td>
-                  <td className="px-4 py-3 text-sm text-gray-700">{batch.quantity}</td>
-                  <td className="px-4 py-3 text-sm text-gray-500">{new Date(batch.expiryDate).toLocaleDateString()}</td>
+              {medicines.map(med => (
+                <tr key={med._id || med.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-3 text-sm font-mono font-medium">{med.batchNumber}</td>
+                  <td className="px-4 py-3 text-sm text-gray-700">{med.name}</td>
+                  <td className="px-4 py-3 text-sm text-gray-700">{med.quantity}</td>
+                  <td className="px-4 py-3 text-sm text-gray-500">{new Date(med.expiryDate).toLocaleDateString()}</td>
                   <td className="px-4 py-3">
-                    <Badge variant={batch.status === 'active' ? 'success' : 'danger'}>{batch.status}</Badge>
+                    <Badge variant={med.status === 'active' ? 'success' : 'danger'}>{med.status}</Badge>
                   </td>
                   <td className="px-4 py-3">
-                    {batch.status === 'active' && (
-                      <Button
-                        size="sm"
-                        variant="danger"
-                        onClick={() => setConfirmRecall(batch)}
-                      >
+                    {med.status === 'active' && (
+                      <Button size="sm" variant="danger" onClick={() => setConfirmRecall(med)}>
                         <AlertCircle size={14} /> Recall
                       </Button>
                     )}
                   </td>
                 </tr>
               ))}
+              {medicines.length === 0 && <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">No active medicines found</td></tr>}
             </tbody>
           </table>
         </div>
@@ -116,18 +106,18 @@ export default function ProductRecall() {
               </div>
               <p className="text-sm text-red-600">
                 You are about to recall batch <strong>{confirmRecall.batchNumber}</strong>
-                of <strong>{confirmRecall.medicineName}</strong>. This will notify all users in the supply chain.
+                of <strong>{confirmRecall.name}</strong>. This will be recorded on the blockchain.
               </p>
             </div>
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div><span className="text-gray-500">Batch:</span> {confirmRecall.batchNumber}</div>
-              <div><span className="text-gray-500">Medicine:</span> {confirmRecall.medicineName}</div>
+              <div><span className="text-gray-500">Medicine:</span> {confirmRecall.name}</div>
               <div><span className="text-gray-500">Quantity:</span> {confirmRecall.quantity}</div>
               <div><span className="text-gray-500">Expiry:</span> {new Date(confirmRecall.expiryDate).toLocaleDateString()}</div>
             </div>
             <div className="flex gap-3">
-              <Button variant="danger" onClick={handleRecall} className="flex-1">
-                Confirm Recall
+              <Button variant="danger" onClick={handleRecall} disabled={recalling} className="flex-1">
+                {recalling ? 'Processing...' : 'Confirm Recall'}
               </Button>
               <Button variant="secondary" onClick={() => setConfirmRecall(null)} className="flex-1">
                 Cancel

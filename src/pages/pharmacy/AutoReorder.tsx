@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../lib/auth';
-import { getDB, generateId } from '../../lib/db';
-import { RefreshCw, Package, Send } from 'lucide-react';
+import { stockApi, authApi, shipmentApi } from '../../lib/api';
+import { RefreshCw, Package } from 'lucide-react';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
@@ -14,67 +14,56 @@ export default function AutoReorder() {
   const [loading, setLoading] = useState(true);
   const [success, setSuccess] = useState('');
 
-  useEffect(() => {
-    const fetchData = async () => {
-      const db = await getDB();
-      const users = await db.getAll('users');
-      const allStock = await db.getAll('stock');
-      const allOrders = await db.getAll('orders');
-
-      setDealers(users.filter(u => u.role === 'dealer'));
-      setStock(allStock.filter(s => s.ownerId === user?.id));
-      setReorderOrders(allOrders.filter(o => o.fromId === user?.id && o.toRole === 'dealer').reverse());
+  const fetchData = async () => {
+    try {
+      const [stockRes, dealerRes, shipRes] = await Promise.all([
+        stockApi.getLowStock(50),
+        authApi.getDealers(),
+        shipmentApi.list(),
+      ]);
+      setStock(stockRes.items || []);
+      setDealers(dealerRes.dealers || []);
+      // Outgoing shipments from pharmacy to dealer for reorder history
+      setReorderOrders((shipRes.items || []).filter((o: any) =>
+        (o.fromId === user?.id) && o.toRole === 'dealer'
+      ).reverse());
+    } catch (e) {
+      console.error(e);
+    } finally {
       setLoading(false);
-    };
-    fetchData();
-  }, [user]);
+    }
+  };
+
+  useEffect(() => { fetchData(); }, [user]);
 
   const handleReorder = async () => {
-    const db = await getDB();
     const lowStock = stock.filter(s => s.quantity < 50);
-
-    if (lowStock.length === 0) {
-      setSuccess('All items are well-stocked!');
-      return;
-    }
-
+    if (lowStock.length === 0) { setSuccess('All items are well-stocked!'); return; }
     const dealer = dealers[0];
-    if (!dealer) { alert('No dealer available'); return; }
+    if (!dealer) { alert('No verified dealer available'); return; }
 
-    const now = new Date().toISOString();
-    const orderId = generateId();
-    const items = lowStock.map(s => ({
-      medicineId: s.medicineId,
-      medicineName: s.medicineName,
-      quantity: 100 - s.quantity,
-      price: s.price,
-    }));
-    const total = items.reduce((sum, item) => sum + item.quantity * item.price, 0);
-
-    await db.add('orders', {
-      id: orderId,
-      orderNumber: `REORDER-${Date.now().toString(36).toUpperCase()}`,
-      fromId: user!.id,
-      fromName: user!.name,
-      fromRole: 'pharmacy',
-      toId: dealer.id,
-      toName: dealer.name,
-      toRole: 'dealer',
-      items,
-      totalAmount: total,
-      status: 'pending',
-      createdAt: now,
-      updatedAt: now,
-    });
-
-    setSuccess(`Reorder sent for ${items.length} items (Total: ₹${total})`);
-    const allOrders = await db.getAll('orders');
-    setReorderOrders(allOrders.filter(o => o.fromId === user?.id && o.toRole === 'dealer').reverse());
+    try {
+      await shipmentApi.create({
+        toId: dealer._id || dealer.id,
+        expectedDelivery: new Date(Date.now() + 86400000 * 2).toISOString(),
+        items: lowStock.map(s => ({
+          medicineId: s.medicineId,
+          medicineName: s.medicineName,
+          batchNumber: s.batchNumber,
+          quantity: 100 - s.quantity,
+          price: s.price,
+        })),
+      });
+      setSuccess(`Reorder request sent for ${lowStock.length} items to ${dealer.name}`);
+      fetchData();
+    } catch (e: any) {
+      alert(e.message || 'Reorder failed');
+    }
   };
 
   if (loading) return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" /></div>;
 
-  const lowStockItems = stock.filter(s => s.quantity < 50);
+  const lowStockItems = stock;
 
   return (
     <div className="space-y-6">
@@ -86,8 +75,8 @@ export default function AutoReorder() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card title="Low Stock Items" subtitle={`${lowStockItems.length} items need reorder`} icon={<Package />}>
           {lowStockItems.length === 0 ? <p className="text-center py-8 text-gray-500">All items are well-stocked!</p> : (
-            <div className="space-y-2">{lowStockItems.map(item => (
-              <div key={item.id} className="flex justify-between items-center p-3 bg-red-50 rounded-lg border border-red-100">
+            <div className="space-y-2">{lowStockItems.map((item: any) => (
+              <div key={item._id || item.id} className="flex justify-between items-center p-3 bg-red-50 rounded-lg border border-red-100">
                 <div><p className="font-medium text-sm">{item.medicineName}</p><p className="text-xs text-gray-500">Batch: {item.batchNumber}</p></div>
                 <div className="text-right"><p className="text-sm font-bold text-red-600">{item.quantity}</p><p className="text-xs text-gray-400">in stock</p></div>
               </div>
@@ -96,11 +85,11 @@ export default function AutoReorder() {
         </Card>
         <Card title="Reorder History" icon={<RefreshCw />}>
           <div className="overflow-y-auto max-h-96">
-            {reorderOrders.map(order => (
-              <div key={order.id} className="p-3 border-b border-gray-100 last:border-0">
+            {reorderOrders.map((order: any) => (
+              <div key={order._id || order.id} className="p-3 border-b border-gray-100 last:border-0">
                 <div className="flex justify-between items-start mb-1">
-                  <span className="text-sm font-medium text-gray-900">{order.orderNumber}</span>
-                  <Badge variant={order.status === 'delivered' ? 'success' : order.status === 'pending' ? 'warning' : 'info'}>{order.status}</Badge>
+                  <span className="text-sm font-medium text-gray-900">{order.shipmentNumber}</span>
+                  <Badge variant={order.status === 'DELIVERED_TO_DEALER' ? 'success' : order.status === 'CREATED' ? 'warning' : 'info'}>{order.status?.replace('_', ' ')}</Badge>
                 </div>
                 <p className="text-xs text-gray-500">To: {order.toName} | ₹{order.totalAmount}</p>
                 <p className="text-xs text-gray-400">{new Date(order.createdAt).toLocaleString()}</p>

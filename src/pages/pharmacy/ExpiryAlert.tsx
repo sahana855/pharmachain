@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../lib/auth';
-import { getDB } from '../../lib/db';
+import { stockApi } from '../../lib/api';
 import { AlertTriangle, Calendar } from 'lucide-react';
 import Card from '../../components/ui/Card';
 import Badge from '../../components/ui/Badge';
@@ -12,17 +12,21 @@ export default function ExpiryAlert() {
 
   useEffect(() => {
     const fetchData = async () => {
-      const db = await getDB();
-      const all = await db.getAll('stock');
-      const myStock = all.filter(s => s.ownerId === user?.id);
-      const now = new Date();
-      const threeMonths = new Date(now.getFullYear(), now.getMonth() + 3, now.getDate());
-      const expiring = myStock.filter(s => {
-        const exp = new Date(s.expiryDate);
-        return exp <= threeMonths;
-      }).sort((a, b) => new Date(a.expiryDate).getTime() - new Date(b.expiryDate).getTime());
-      setStock(expiring);
-      setLoading(false);
+      try {
+        const res = await stockApi.list();
+        const all = res.items || [];
+        const now = new Date();
+        const threeMonths = new Date(now.getFullYear(), now.getMonth() + 3, now.getDate());
+        const expiring = all.filter((s: any) => {
+          const exp = new Date(s.expiryDate);
+          return exp <= threeMonths;
+        }).sort((a: any, b: any) => new Date(a.expiryDate).getTime() - new Date(b.expiryDate).getTime());
+        setStock(expiring);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
     };
     fetchData();
   }, [user]);
@@ -52,7 +56,7 @@ export default function ExpiryAlert() {
                 const daysLeft = Math.ceil(diff / (1000 * 60 * 60 * 24));
                 const isExpired = daysLeft <= 0;
                 return (
-                  <tr key={s.id} className="hover:bg-gray-50">
+                  <tr key={s._id || s.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 text-sm font-medium">{s.medicineName}</td>
                     <td className="px-4 py-3 text-sm font-mono">{s.batchNumber}</td>
                     <td className="px-4 py-3 text-sm">{s.quantity}</td>

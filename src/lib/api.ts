@@ -95,6 +95,10 @@ export const authApi = {
   getDealers: () => request('/api/auth/dealers'),
   approveUser: (id: string) => request(`/api/auth/users/${id}/approve`, { method: 'POST' }),
   rejectUser: (id: string) => request(`/api/auth/users/${id}/reject`, { method: 'POST' }),
+  listUsers: (role?: string) => {
+    const qs = role ? `?role=${encodeURIComponent(role)}` : '';
+    return request(`/api/auth/users/by-role${qs}`);
+  },
 };
 
 // ---------- Medicines ----------
@@ -108,6 +112,7 @@ export const medicineApi = {
   getCatalog: (q = '') => request(`/api/medicines/catalog${q ? `?q=${encodeURIComponent(q)}` : ''}`),
   updateStatus: (id: string, status: string) =>
     request(`/api/medicines/${id}/status`, { method: 'PATCH', body: { status } }),
+  search: (q: string) => request(`/api/medicines?q=${encodeURIComponent(q)}`),
 };
 
 // ---------- QR Verification ----------
@@ -128,6 +133,8 @@ export const shipmentApi = {
     request(`/api/shipments/${id}/status`, { method: 'PATCH', body: payload }),
   assignTransport: (id: string, transportId: string) =>
     request(`/api/shipments/${id}/assign`, { method: 'PATCH', body: { transportId } }),
+  acceptDelivery: (id: string) =>
+    request(`/api/shipments/${id}/accept`, { method: 'POST' }),
 };
 
 // ---------- Tracking ----------
@@ -170,3 +177,8 @@ export const adminApi = {
   getStats: () => request('/api/admin/stats'),
 };
 
+// ---------- Stock ----------
+export const stockApi = {
+  list: () => request('/api/stock'),
+  getLowStock: (threshold: number = 50) => request(`/api/stock/low?threshold=${threshold}`),
+};

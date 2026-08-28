@@ -1,62 +1,41 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../lib/auth';
-import { getDB, generateId } from '../../lib/db';
+import { stockApi } from '../../lib/api';
 import { ArrowLeftRight, Plus, AlertCircle } from 'lucide-react';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
-import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
 
 export default function DamagedReturns() {
   const { user } = useAuth();
-  const [returns, setReturns] = useState<any[]>([]);
+  const [returns] = useState<any[]>([]);
   const [stock, setStock] = useState<any[]>([]);
-  const [manufacturers, setManufacturers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({ stockId: '', quantity: '', reason: '' });
   const [success, setSuccess] = useState('');
 
   const fetchData = async () => {
-    const db = await getDB();
-    const allReturns = await db.getAll('returns');
-    const allStock = await db.getAll('stock');
-    const users = await db.getAll('users');
-
-    setReturns(allReturns.filter(r => r.fromId === user?.id).reverse());
-    setStock(allStock.filter(s => s.ownerId === user?.id && s.quantity > 0));
-    setManufacturers(users.filter(u => u.role === 'manufacturer'));
-    setLoading(false);
+    try {
+      const stockRes = await stockApi.list();
+      setStock((stockRes.items || []).filter((s: any) => s.quantity > 0));
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { fetchData(); }, [user]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const db = await getDB();
-    const stockItem = stock.find(s => s.id === form.stockId);
-    const manufacturer = manufacturers[0];
-
-    if (!stockItem || !manufacturer) return;
-
-    await db.add('returns', {
-      id: generateId(),
-      medicineId: stockItem.medicineId,
-      medicineName: stockItem.medicineName,
-      batchNumber: stockItem.batchNumber,
-      fromId: user!.id,
-      fromRole: 'dealer',
-      toId: manufacturer.id,
-      reason: form.reason,
-      quantity: parseInt(form.quantity),
-      status: 'requested' as const,
-      createdAt: new Date().toISOString(),
-    });
-
-    setSuccess(`Return request for ${stockItem.medicineName} submitted`);
+    const stockItem = stock.find((s: any) => (s._id || s.id) === form.stockId);
+    if (!stockItem) return;
+    // No backend returns API yet — notify user
+    setSuccess(`Return request for ${stockItem.medicineName} noted. Please contact your manufacturer directly.`);
     setShowModal(false);
     setForm({ stockId: '', quantity: '', reason: '' });
-    fetchData();
   };
 
   if (loading) {
@@ -84,22 +63,11 @@ export default function DamagedReturns() {
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Batch</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Qty</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Reason</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Status</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Date</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {returns.map(r => (
-                <tr key={r.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 text-sm font-medium">{r.medicineName}</td>
-                  <td className="px-4 py-3 text-sm font-mono">{r.batchNumber}</td>
-                  <td className="px-4 py-3 text-sm">{r.quantity}</td>
-                  <td className="px-4 py-3 text-sm text-gray-500">{r.reason}</td>
-                  <td className="px-4 py-3"><Badge variant={r.status === 'completed' ? 'success' : r.status === 'approved' ? 'info' : 'warning'}>{r.status}</Badge></td>
-                  <td className="px-4 py-3 text-sm text-gray-500">{new Date(r.createdAt).toLocaleDateString()}</td>
-                </tr>
-              ))}
-              {returns.length === 0 && <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">No return requests</td></tr>}
+              {returns.length === 0 && <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-500">No return requests</td></tr>}
             </tbody>
           </table>
         </div>
@@ -111,7 +79,7 @@ export default function DamagedReturns() {
             <label className="block text-sm font-medium text-gray-700 mb-1">Select Medicine</label>
             <select value={form.stockId} onChange={e => setForm({ ...form, stockId: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required>
               <option value="">Choose...</option>
-              {stock.map(s => <option key={s.id} value={s.id}>{s.medicineName} (Batch: {s.batchNumber})</option>)}
+              {stock.map((s: any) => <option key={s._id || s.id} value={s._id || s.id}>{s.medicineName} (Batch: {s.batchNumber})</option>)}
             </select>
           </div>
           <div>

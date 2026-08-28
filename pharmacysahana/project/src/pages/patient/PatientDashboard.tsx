@@ -43,7 +43,7 @@ export default function PatientDashboard() {
 
   useEffect(() => {
     fetchData();
-    const timer = setInterval(fetchData, 15000);
+    const timer = setInterval(fetchData, 30000);
     return () => clearInterval(timer);
   }, [fetchData]);
 

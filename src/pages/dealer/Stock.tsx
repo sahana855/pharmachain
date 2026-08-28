@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../lib/auth';
-import { getDB } from '../../lib/db';
+import { stockApi } from '../../lib/api';
 import { Package } from 'lucide-react';
 import Card from '../../components/ui/Card';
 import Badge from '../../components/ui/Badge';
@@ -12,10 +12,14 @@ export default function DealerStock() {
 
   useEffect(() => {
     const fetchData = async () => {
-      const db = await getDB();
-      const all = await db.getAll('stock');
-      setStockItems(all.filter(s => s.ownerId === user?.id));
-      setLoading(false);
+      try {
+        const res = await stockApi.list();
+        setStockItems(res.items || []);
+      } catch (e) {
+        console.error('Failed to load stock', e);
+      } finally {
+        setLoading(false);
+      }
     };
     fetchData();
   }, [user]);

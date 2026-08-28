@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../lib/auth';
-import { getDB, generateId } from '../../lib/db';
+import { shipmentApi, authApi, stockApi } from '../../lib/api';
 import { Truck, Send } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
@@ -14,88 +14,69 @@ export default function DealerDispatch() {
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({ pharmacyId: '', stockId: '', quantity: '', routePath: '' });
   const [success, setSuccess] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const [stockRes, usersRes, shipmentsRes] = await Promise.all([
+        stockApi.list(),
+        authApi.listUsers('pharmacy'),
+        shipmentApi.list()
+      ]);
+      setStock(stockRes.items || []);
+      setPharmacies(usersRes.users || []);
+      setOrders(shipmentsRes.items || []);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Failed to load data');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchData = async () => {
-      const db = await getDB();
-      const users = await db.getAll('users');
-      const allStock = await db.getAll('stock');
-      const allOrders = await db.getAll('orders');
-
-      setPharmacies(users.filter(u => u.role === 'pharmacy'));
-      setStock(allStock.filter(s => s.ownerId === user?.id && s.quantity > 0));
-      setOrders(allOrders.filter(o => o.fromId === user?.id || o.toId === user?.id).reverse());
-      setLoading(false);
-    };
     fetchData();
   }, [user]);
 
   const handleDispatch = async (e: React.FormEvent) => {
     e.preventDefault();
     setSuccess('');
+    setErrorMsg('');
 
-    const db = await getDB();
-    const stockItem = await db.get('stock', form.stockId);
-    const pharmacy = pharmacies.find(p => p.id === form.pharmacyId);
+    const stockItem = stock.find(s => s._id === form.stockId || s.id === form.stockId);
+    const pharmacy = pharmacies.find(p => p._id === form.pharmacyId || p.id === form.pharmacyId);
     const quantity = parseInt(form.quantity);
 
     if (!stockItem || stockItem.quantity < quantity) {
-      alert('Insufficient stock!');
+      setErrorMsg('Insufficient stock!');
       return;
     }
 
-    const orderId = generateId();
-    const now = new Date().toISOString();
+    try {
+      await shipmentApi.create({
+        toId: pharmacy._id || pharmacy.id,
+        expectedDelivery: new Date(Date.now() + 86400000 * 3).toISOString(), // +3 days
+        routePath: form.routePath,
+        items: [
+          {
+            medicineId: stockItem.medicineId,
+            medicineName: stockItem.medicineName,
+            batchNumber: stockItem.batchNumber,
+            quantity: quantity,
+            price: stockItem.price
+          }
+        ]
+      });
 
-    stockItem.quantity -= quantity;
-    if (stockItem.quantity <= 0) {
-      await db.delete('stock', stockItem.id);
-    } else {
-      await db.put('stock', stockItem);
+      setSuccess(`Dispatched ${quantity} units of ${stockItem.medicineName} to ${pharmacy.name}`);
+      setForm({ pharmacyId: '', stockId: '', quantity: '', routePath: '' });
+      await fetchData();
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Dispatch failed');
     }
-
-    await db.add('orders', {
-      id: orderId,
-      orderNumber: `ORD-${Date.now().toString(36).toUpperCase()}`,
-      fromId: user!.id,
-      fromName: user!.name,
-      fromRole: 'dealer',
-      toId: pharmacy!.id,
-      toName: pharmacy!.name,
-      toRole: 'pharmacy',
-      routePath: form.routePath,
-      items: [{ medicineId: stockItem.medicineId, medicineName: stockItem.medicineName, quantity, price: stockItem.price }],
-      totalAmount: quantity * stockItem.price,
-      status: 'dispatched' as const,
-      createdAt: now,
-      updatedAt: now,
-    });
-
-    // Add stock to pharmacy
-    await db.add('stock', {
-      id: generateId(),
-      medicineId: stockItem.medicineId,
-      medicineName: stockItem.medicineName,
-      batchNumber: stockItem.batchNumber,
-      ownerId: pharmacy!.id,
-      ownerRole: 'pharmacy',
-      quantity,
-      price: stockItem.price,
-      expiryDate: stockItem.expiryDate,
-      updatedAt: now,
-    });
-
-    setSuccess(`Dispatched ${quantity} units of ${stockItem.medicineName} to ${pharmacy!.name}`);
-    setForm({ pharmacyId: '', stockId: '', quantity: '', routePath: '' });
-
-    // Refresh
-    const allStock = await db.getAll('stock');
-    const allOrders = await db.getAll('orders');
-    setStock(allStock.filter(s => s.ownerId === user?.id && s.quantity > 0));
-    setOrders(allOrders.filter(o => o.fromId === user?.id || o.toId === user?.id).reverse());
   };
 
-  const selectedStock = stock.find(s => s.id === form.stockId);
+  const selectedStock = stock.find(s => s._id === form.stockId || s.id === form.stockId);
 
   if (loading) {
     return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" /></div>;
@@ -111,19 +92,21 @@ export default function DealerDispatch() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card title="New Dispatch" icon={<Truck />}>
           {success && <div className="mb-4 p-4 bg-green-50 border border-green-200 text-green-700 rounded-lg text-sm">{success}</div>}
+          {errorMsg && <div className="mb-4 p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">{errorMsg}</div>}
+          
           <form onSubmit={handleDispatch} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Select Pharmacy</label>
               <select value={form.pharmacyId} onChange={e => setForm({ ...form, pharmacyId: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required>
                 <option value="">Choose a pharmacy...</option>
-                {pharmacies.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                {pharmacies.map(p => <option key={p._id || p.id} value={p._id || p.id}>{p.name}</option>)}
               </select>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Select Medicine</label>
               <select value={form.stockId} onChange={e => setForm({ ...form, stockId: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required>
                 <option value="">Choose a medicine...</option>
-                {stock.map(s => <option key={s.id} value={s.id}>{s.medicineName} (Stock: {s.quantity})</option>)}
+                {stock.filter(s => s.quantity > 0).map(s => <option key={s._id || s.id} value={s._id || s.id}>{s.medicineName} (Stock: {s.quantity})</option>)}
               </select>
             </div>
             <div>
@@ -149,10 +132,10 @@ export default function DealerDispatch() {
         <Card title="Recent Dispatches" icon={<Truck />}>
           <div className="overflow-y-auto max-h-96">
             {orders.map(order => (
-              <div key={order.id} className="p-3 border-b border-gray-100 last:border-0">
+              <div key={order._id || order.id} className="p-3 border-b border-gray-100 last:border-0">
                 <div className="flex justify-between items-start mb-1">
-                  <span className="text-sm font-medium text-gray-900">{order.orderNumber}</span>
-                  <Badge variant={order.status === 'delivered' ? 'success' : order.status === 'in_transit' ? 'info' : 'warning'}>{order.status.replace('_', ' ')}</Badge>
+                  <span className="text-sm font-medium text-gray-900">{order.shipmentNumber || order.orderNumber}</span>
+                  <Badge variant={order.status === 'DELIVERED' || order.status === 'DELIVERED_TO_PHARMACY' ? 'success' : order.status === 'IN_TRANSIT' ? 'info' : 'warning'}>{order.status?.replace('_', ' ')}</Badge>
                 </div>
                 <p className="text-xs text-gray-500">To: {order.toName}</p>
                 {order.routePath && <p className="text-xs text-blue-600">Path: {order.routePath}</p>}

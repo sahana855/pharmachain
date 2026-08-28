@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../lib/auth';
-import { getDB } from '../../lib/db';
+import { shipmentApi } from '../../lib/api';
 import { History, ArrowDownRight, ArrowUpRight } from 'lucide-react';
 import Card from '../../components/ui/Card';
 import Badge from '../../components/ui/Badge';
@@ -12,11 +12,15 @@ export default function StockHistory() {
 
   useEffect(() => {
     const fetchData = async () => {
-      const db = await getDB();
-      const allOrders = await db.getAll('orders');
-      const myOrders = allOrders.filter(o => o.fromId === user?.id || o.toId === user?.id).reverse();
-      setOrders(myOrders);
-      setLoading(false);
+      try {
+        const res = await shipmentApi.list();
+        const myOrders = (res.items || []).filter((o: any) => o.fromId === user?.id || o.toId === user?.id).reverse();
+        setOrders(myOrders);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
     };
     fetchData();
   }, [user]);
@@ -48,9 +52,9 @@ export default function StockHistory() {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {orders.map(order => {
-                const isIncoming = order.toId === user?.id;
+                const isIncoming = order.toId === user?.id || order.toId?._id === user?.id;
                 return (
-                  <tr key={order.id} className="hover:bg-gray-50">
+                  <tr key={order._id || order.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3">
                       {isIncoming ? (
                         <div className="flex items-center gap-1 text-green-600"><ArrowDownRight size={16} /><span className="text-xs font-medium">IN</span></div>
@@ -58,11 +62,11 @@ export default function StockHistory() {
                         <div className="flex items-center gap-1 text-red-600"><ArrowUpRight size={16} /><span className="text-xs font-medium">OUT</span></div>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-sm font-mono font-medium">{order.orderNumber}</td>
+                    <td className="px-4 py-3 text-sm font-mono font-medium">{order.shipmentNumber || order.orderNumber}</td>
                     <td className="px-4 py-3 text-sm">{isIncoming ? order.fromName : order.toName}</td>
                     <td className="px-4 py-3 text-sm">{order.items.map((i: any) => `${i.medicineName} x${i.quantity}`).join(', ')}</td>
                     <td className="px-4 py-3 text-sm">₹{order.totalAmount}</td>
-                    <td className="px-4 py-3"><Badge variant={order.status === 'delivered' ? 'success' : order.status === 'pending' ? 'warning' : 'info'}>{order.status.replace('_', ' ')}</Badge></td>
+                    <td className="px-4 py-3"><Badge variant={order.status === 'DELIVERED' || order.status === 'DELIVERED_TO_PHARMACY' ? 'success' : order.status === 'CREATED' ? 'warning' : 'info'}>{order.status?.replace('_', ' ')}</Badge></td>
                     <td className="px-4 py-3 text-sm text-gray-500">{new Date(order.createdAt).toLocaleDateString()}</td>
                   </tr>
                 );

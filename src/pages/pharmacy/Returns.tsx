@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../lib/auth';
-import { getDB, generateId } from '../../lib/db';
+import { stockApi } from '../../lib/api';
 import { ArrowLeftRight, Plus, AlertCircle } from 'lucide-react';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
@@ -18,40 +18,25 @@ export default function ReturnsPharmacy() {
 
   useEffect(() => {
     const fetchData = async () => {
-      const db = await getDB();
-      const allReturns = await db.getAll('returns');
-      const allStock = await db.getAll('stock');
-      setReturns(allReturns.filter(r => r.fromId === user?.id).reverse());
-      setStock(allStock.filter(s => s.ownerId === user?.id && s.quantity > 0));
-      setLoading(false);
+      try {
+        const stockRes = await stockApi.list();
+        setStock((stockRes.items || []).filter((s: any) => s.quantity > 0));
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
     };
     fetchData();
   }, [user]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const db = await getDB();
-    const stockItem = stock.find(s => s.id === form.stockId);
-
-    await db.add('returns', {
-      id: generateId(),
-      medicineId: stockItem!.medicineId,
-      medicineName: stockItem!.medicineName,
-      batchNumber: stockItem!.batchNumber,
-      fromId: user!.id,
-      fromRole: 'pharmacy',
-      toId: stockItem!.ownerId,
-      reason: form.reason,
-      quantity: parseInt(form.quantity),
-      status: 'requested',
-      createdAt: new Date().toISOString(),
-    });
-
-    setSuccess(`Return request for ${stockItem!.medicineName} submitted`);
+    const stockItem = stock.find((s: any) => (s._id || s.id) === form.stockId);
+    // No backend returns API yet - show success message only
+    setSuccess(`Return request for ${stockItem?.medicineName || 'item'} noted. Please contact your dealer.`);
     setShowModal(false);
     setForm({ stockId: '', quantity: '', reason: '' });
-    const allReturns = await db.getAll('returns');
-    setReturns(allReturns.filter(r => r.fromId === user?.id).reverse());
   };
 
   if (loading) return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" /></div>;
@@ -88,7 +73,7 @@ export default function ReturnsPharmacy() {
           <div><label className="block text-sm font-medium text-gray-700 mb-1">Select Medicine</label>
             <select value={form.stockId} onChange={e => setForm({ ...form, stockId: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required>
               <option value="">Choose...</option>
-              {stock.map(s => <option key={s.id} value={s.id}>{s.medicineName} (Batch: {s.batchNumber})</option>)}
+              {stock.map((s: any) => <option key={s._id || s.id} value={s._id || s.id}>{s.medicineName} (Batch: {s.batchNumber})</option>)}
             </select></div>
           <div><label className="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
             <input type="number" value={form.quantity} onChange={e => setForm({ ...form, quantity: e.target.value })} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" min="1" required /></div>

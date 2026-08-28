@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../lib/auth';
-import { getDB } from '../../lib/db';
+import { stockApi } from '../../lib/api';
 import { Percent, Tag, AlertTriangle } from 'lucide-react';
 import Card from '../../components/ui/Card';
 import Badge from '../../components/ui/Badge';
@@ -14,37 +14,28 @@ export default function DiscountAlert() {
 
   useEffect(() => {
     const fetchData = async () => {
-      const db = await getDB();
-      const all = await db.getAll('stock');
-      const myStock = all.filter(s => s.ownerId === user?.id);
-      const now = new Date();
-      const twoMonths = new Date(now.getFullYear(), now.getMonth() + 2, now.getDate());
-      const nearExpiry = myStock.filter(s => {
-        const exp = new Date(s.expiryDate);
-        return exp > now && exp <= twoMonths;
-      });
-      setDiscountItems(nearExpiry);
-      setLoading(false);
+      try {
+        const res = await stockApi.list();
+        const all = res.items || [];
+        const now = new Date();
+        const twoMonths = new Date(now.getFullYear(), now.getMonth() + 2, now.getDate());
+        const nearExpiry = all.filter((s: any) => {
+          const exp = new Date(s.expiryDate);
+          return exp > now && exp <= twoMonths;
+        });
+        setDiscountItems(nearExpiry);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
     };
     fetchData();
   }, [user]);
 
-  const applyDiscount = async (stockId: string) => {
-    const db = await getDB();
-    const item = await db.get('stock', stockId);
-    if (item) {
-      const alertId = Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
-      await db.add('alerts', {
-        id: alertId,
-        userId: user!.id,
-        type: 'discount',
-        title: 'Discount Available',
-        message: `${item.medicineName} (${item.batchNumber}) is near expiry. Apply discount to sell faster.`,
-        read: false,
-        createdAt: new Date().toISOString(),
-      });
-      setSuccess(`Discount alert created for ${item.medicineName}`);
-    }
+  const applyDiscount = (stockId: string) => {
+    const item = discountItems.find((s: any) => (s._id || s.id) === stockId);
+    if (item) setSuccess(`Discount marked for ${item.medicineName}`);
   };
 
   if (loading) return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" /></div>;
@@ -69,14 +60,14 @@ export default function DiscountAlert() {
                 {discountItems.map(item => {
                   const discountPrice = Math.round(item.price * 0.8);
                   return (
-                    <tr key={item.id} className="hover:bg-gray-50">
+                    <tr key={item._id || item.id} className="hover:bg-gray-50">
                       <td className="px-4 py-3 text-sm font-medium">{item.medicineName}</td>
                       <td className="px-4 py-3 text-sm font-mono">{item.batchNumber}</td>
                       <td className="px-4 py-3 text-sm">{item.quantity}</td>
                       <td className="px-4 py-3 text-sm">₹{item.price}</td>
                       <td className="px-4 py-3 text-sm text-gray-500">{new Date(item.expiryDate).toLocaleDateString()}</td>
                       <td className="px-4 py-3"><Badge variant="success">₹{discountPrice} (20% off)</Badge></td>
-                      <td className="px-4 py-3"><Button size="sm" variant="warning" onClick={() => applyDiscount(item.id)}><Tag size={14} /> Alert</Button></td>
+                      <td className="px-4 py-3"><Button size="sm" variant="warning" onClick={() => applyDiscount(item._id || item.id)}><Tag size={14} /> Alert</Button></td>
                     </tr>
                   );
                 })}

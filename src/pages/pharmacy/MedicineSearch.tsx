@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { getDB } from '../../lib/db';
-import { Search, Package, Filter } from 'lucide-react';
+import { medicineApi } from '../../lib/api';
+import { Search, Package } from 'lucide-react';
 import Card from '../../components/ui/Card';
 import Badge from '../../components/ui/Badge';
 
@@ -12,28 +12,38 @@ export default function MedicineSearch() {
 
   useEffect(() => {
     const fetchData = async () => {
-      const db = await getDB();
-      const medicines = await db.getAll('medicines');
-      setAllMedicines(medicines);
-      setResults(medicines);
-      setLoading(false);
+      try {
+        const res = await medicineApi.list();
+        const medicines = res.items || [];
+        setAllMedicines(medicines);
+        setResults(medicines);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
     };
     fetchData();
   }, []);
 
-  const handleSearch = (value: string) => {
+  const handleSearch = async (value: string) => {
     setQuery(value);
     if (!value.trim()) {
       setResults(allMedicines);
       return;
     }
-    const q = value.toLowerCase();
-    const filtered = allMedicines.filter(m =>
-      m.name.toLowerCase().includes(q) ||
-      m.batchNumber.toLowerCase().includes(q) ||
-      m.manufacturerName.toLowerCase().includes(q)
-    );
-    setResults(filtered);
+    try {
+      const res = await medicineApi.search(value);
+      setResults(res.items || []);
+    } catch (e) {
+      // fallback to client-side filter
+      const q = value.toLowerCase();
+      setResults(allMedicines.filter(m =>
+        m.name?.toLowerCase().includes(q) ||
+        m.batchNumber?.toLowerCase().includes(q) ||
+        m.manufacturerName?.toLowerCase().includes(q)
+      ));
+    }
   };
 
   if (loading) return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" /></div>;
@@ -59,7 +69,7 @@ export default function MedicineSearch() {
             <thead><tr className="bg-gray-50 border-b"><th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Medicine</th><th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Batch</th><th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Manufacturer</th><th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Price</th><th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Expiry</th><th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Stock</th></tr></thead>
             <tbody className="divide-y divide-gray-100">
               {results.map(m => (
-                <tr key={m.id} className="hover:bg-gray-50">
+                <tr key={m._id || m.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 text-sm font-medium">{m.name}</td>
                   <td className="px-4 py-3 text-sm font-mono">{m.batchNumber}</td>
                   <td className="px-4 py-3 text-sm">{m.manufacturerName}</td>

@@ -1,9 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../lib/auth';
 import { useNavigate } from 'react-router-dom';
-import { shipmentApi, transportBoxApi } from '../../lib/api';
+import { shipmentApi, transportBoxApi, stockApi } from '../../lib/api';
 import { useLiveSync } from '../../lib/events';
-import { getDB } from '../../lib/db';
 import { Package, Truck, ShoppingCart, AlertTriangle, ArrowLeftRight, RefreshCw, Waypoints, Boxes } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import Card from '../../components/ui/Card';
@@ -24,19 +23,18 @@ export default function DealerDashboard() {
 
   const fetchData = useCallback(async () => {
     try {
-      const [shipData, boxData, db] = await Promise.all([
+      const [shipData, boxData, stockResponse] = await Promise.all([
         shipmentApi.list(),
         transportBoxApi.list(),
-        getDB(),
+        stockApi.list(),
       ]);
 
       const shipments = shipData.items || [];
       const boxes = boxData.boxes || [];
-      const allStock = await db.getAll('stock');
+      const myStock = stockResponse.items || [];
 
       const myShipments = shipments.filter((s: any) => s.toId === user?.id || s.toId?._id === user?.id || s.fromId === user?.id || s.fromId?._id === user?.id);
       const myBoxes = boxes.filter((b: any) => b.dealerId === user?.id || b.dealerId?._id === user?.id);
-      const myStock = allStock.filter(s => s.ownerId === user?.id);
 
       const now = new Date();
       
